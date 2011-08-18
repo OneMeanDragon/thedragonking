@@ -526,18 +526,18 @@ Public Module ClientData
             Dim command As Long = packet.GetInt32
             If (command < 0) Or (command > 2) Then
                 'bad command
-                Exit Sub
+                Return
             End If
             Dim action As Long = packet.GetInt32
             If (action < 0) Or (action > 1) Then
                 'bad action
-                Exit Sub
+                Return
             End If
             Dim userid As Long = packet.GetInt32
             Dim message As String = packet.GetString
             If Trim(message) = "" Then
                 'bad message
-                Exit Sub
+                Return
             End If
             Select Case command
                 Case PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS
@@ -574,7 +574,7 @@ Public Module ClientData
                         sendmessage.AddString(message)
                         cliTemp.Value.Send(sendmessage)
                     End If
-                    Exit Sub 'exit the loop
+                    Return 'exit the loop
                 End If
             Next
         End Sub
@@ -626,32 +626,32 @@ Public Module ClientData
         Public Sub CMSG_PACKET_COMMAND(ByRef packet As PacketClass, ByRef Client As ClientClass)
             If packet.Data.Length < 10 Then 'header+dword+null+null
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             Dim target As Long = packet.GetInt32
             If target <= 0 Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             Dim sender As String = packet.GetString
             If sender.Length > MAXLENGTH_SENDER Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.MALFORMED_SENDER_NAME, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             ElseIf sender = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_SENDER, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             Dim command As String = packet.GetString
             If command.Length > MAXLENGTH_COMMAND Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             ElseIf command = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             If Not Client.LoggedIn Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             Dim tarFound As Boolean = False
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
@@ -677,13 +677,13 @@ Public Module ClientData
                         cliTemp.Value.Send(sendcommand)
                     Else
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                 End If
             Next
             If Not tarFound Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
         End Sub
 
@@ -710,6 +710,7 @@ Public Module ClientData
                             '		I = ID control, may create and modify hub IDs
                             '		S = botnet service
                             '	(4.1) (Admin only) (DWORD) IP address of the bot being described
+                            '           Sent only to users with flags (A or L)
                             '	(STRING:20) bot name
                             '	(STRING:*) bot channel
                             '	(DWORD) bot server
@@ -720,9 +721,10 @@ Public Module ClientData
                             '4.1 here
                             joined.AddInt32(GetDatabaseFlag(Client.Account))
                             joined.AddInt32(GetAccountFlag(Client.Account))
-                            'if user is an admin hell recieve this
-                            'joined.AddInt32(ip)
-                            '/end 4.1
+                            'TODO:
+                            'If ((cliTemp.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                            '   joined.AddByteArray(Client.IP.GetAddressBytes())
+                            'End If
                             joined.AddString(Client.BattleNetName)
                             joined.AddString(Client.BattleNetChannel)
                             joined.AddInt32(Client.BattleNetIP)
@@ -741,9 +743,10 @@ Public Module ClientData
                             '4.1 here
                             ImLoggedInResponse.AddInt32(GetDatabaseFlag(imLoggedIn.Value.Account))
                             ImLoggedInResponse.AddInt32(GetAccountFlag(imLoggedIn.Value.Account))
-                            'if user is an admin hell recieve this
-                            'response.AddInt32(ip)
-                            '/end 4.1
+                            'TODO:
+                            'If ((imLoggedIn.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((imLoggedIn.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                            '   ImLoggedInResponse.AddByteArray(imLoggedIn.IP.GetAddressBytes())
+                            'End If
                             ImLoggedInResponse.AddString(imLoggedIn.Value.BattleNetName)
                             ImLoggedInResponse.AddString(imLoggedIn.Value.BattleNetChannel)
                             ImLoggedInResponse.AddInt32(imLoggedIn.Value.BattleNetIP)
@@ -761,9 +764,9 @@ Public Module ClientData
                                 '4.1 here
                                 response.AddInt32(GetDatabaseFlag(cliTemp2.Value.Account))
                                 response.AddInt32(GetAccountFlag(cliTemp2.Value.Account))
-                                'if user is an admin hell recieve this
-                                'response.AddInt32(ip)
-                                '/end 4.1
+                                'If ((cliTemp2.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp2.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                                '   response.AddByteArray(cliTemp2.IP.GetAddressBytes())
+                                'End If
                                 response.AddString(cliTemp2.Value.BattleNetName)
                                 response.AddString(cliTemp2.Value.BattleNetChannel)
                                 response.AddInt32(cliTemp2.Value.BattleNetIP)
@@ -779,7 +782,7 @@ Public Module ClientData
                 End If
             Else
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_USERINFO, PROTOCOL_VIOLATION_COMMAND_6.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
 
             Debug.Print("CMSG_PACKET_USERINFO" & vbNewLine)
@@ -808,7 +811,7 @@ Public Module ClientData
             Dim command As Integer = packet.GetInt32
             If (command < 0) Or (command > 2) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.BAD_SUBCOMMAND, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             Dim accName As String = ""
             Dim accPass As String = ""
@@ -823,13 +826,13 @@ Public Module ClientData
                     accName = packet.GetString
                     If accName = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_USERNAME, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     Dim UserIsLoggedOn As Boolean = IsUserNameOnLine(accName)
                     accPass = packet.GetString
                     If accPass = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
 
@@ -846,17 +849,17 @@ Public Module ClientData
                     accName = packet.GetString
                     If accName = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_USERNAME, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     accOldPass = packet.GetString
                     If accOldPass = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     accNewPass = packet.GetString
                     If accNewPass = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.SC1_EMPTY_NEWPASSWORD, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD)
                     response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
@@ -868,12 +871,12 @@ Public Module ClientData
                     accName = packet.GetString
                     If accName = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_USERNAME, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     accPass = packet.GetString
                     If accPass = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
-                        Exit Sub
+                        Return
                     End If
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.CREATE_ACCOUNT)
                     response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
@@ -890,41 +893,41 @@ Public Module ClientData
         Public Sub CMSG_PACKET_STATSUPDATE(ByRef packet As PacketClass, ByRef Client As ClientClass)
             If Not Client.HUB_AUTHORIZED Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.CLIENT_NOTYET_AUTHORIZED, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             ElseIf Not Client.Authorized Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.CLIENT_NOTYET_AUTHORIZED, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
 
             Client.BattleNetName = packet.GetString
             If Client.BattleNetName.Length > MAXLENGTH_BATTLENET_NAME Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.LEN_VIOLATES_BATTLENET_NAME_LENGTH, packet.Length, packet.Offset)
-                Exit Sub
+                Return
             ElseIf Client.BattleNetName = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BLANK_BATTLENET_NAME_EMPTY, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
 
             Client.BattleNetChannel = packet.GetString
             If Client.BattleNetChannel.Length > MAXLENGTH_BATTLENET_CHANNEL Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.LEN_VIOLATES_CHANNEL_NAME_LENGTH, packet.Length, packet.Offset)
-                Exit Sub
+                Return
             ElseIf Client.BattleNetChannel = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BLANK_BATTLENET_CHANNELNAME_EMPTY, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
 
             Client.BattleNetIP = packet.GetInt32
             Dim tmpStr As String = packet.GetString
             If tmpStr.Length > MAXLENGTH_DATABASE_ID Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BAD_DATABASE_SIZE, packet.Length, packet.Offset)
-                Exit Sub
+                Return
             ElseIf tmpStr = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BADLYFORMED_DATABASE_STRING, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             ElseIf tmpStr.Split(" ").Length <> 2 Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BADLYFORMED_DATABASE_STRING, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             Dim DatabaseData() As String = tmpStr.Split(" ")
             Client.DatabaseAccountID = DatabaseData(0)
@@ -933,7 +936,7 @@ Public Module ClientData
             Client.IsCycleing = packet.GetInt32
             If (Client.IsCycleing < 0) Or (Client.IsCycleing > 1) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BAD_DATABASE_SIZE, packet.Length, packet.Offset)
-                Exit Sub
+                Return
             End If
 
             Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
@@ -948,7 +951,7 @@ Public Module ClientData
         Public Sub CMSG_PACKET_LOGON(ByRef packet As PacketClass, ByRef Client As ClientClass)
             If Client.HUB_AUTHORIZED Then 'Tryed to logon again after allready loging on
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
             If packet.ProtocalVersion < BOTNET_PROTO_VERSION Then
                 Dim VerResponse As New PacketClass(OPCODES.PACKET_BOTNETVERSION)
@@ -959,19 +962,19 @@ Public Module ClientData
             Client.HUB_ID = packet.GetString
             If Client.HUB_ID.Length > MAXLENGTH_HUB_ID Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.BAD_STRLEN_HUBID, packet.Length, packet.Offset)
-                Exit Sub
+                Return
             ElseIf Client.HUB_ID = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.STR_BLANK_HUBID, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
 
             Client.HUB_PASSWORD = packet.GetString
             If Client.HUB_PASSWORD.Length > MAXLENGTH_HUB_PASSWORD Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.BAD_STRLEN_HUB_PASSWORD, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             ElseIf Client.HUB_PASSWORD = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.STR_BLANK_HUB_PASSWORD, packet.Length, (packet.Length - packet.Offset))
-                Exit Sub
+                Return
             End If
 
             Dim HUB_RESPONCE As HUB_ID_RESPONCES
