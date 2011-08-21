@@ -29,6 +29,7 @@ Public Module ClientData
         Public IP As Net.IPAddress
         Public Port As UInteger
         Public Account As String = ""
+        Public AccountFlag As Long = 0
         Public HUB_ID As String = ""
         Public HUB_PASSWORD As String = ""
         Public HUB_AUTHORIZED As Boolean = False
@@ -834,6 +835,16 @@ Public Module ClientData
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
+                    'VALIDATE ACCOUNT:
+                    'Dim ValidatedAccount As Boolean = "USER_PASSWORD_CORRECT"
+                    'If UserIsLoggedOn And ValidatedAccount Then
+                    '    KickUser(accName)
+                    'Else
+                    '    If Not ValidatedAccount Then
+                    '        Me.Delete()
+                    '        Return
+                    '    End If
+                    'End If
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
 
                     response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
@@ -947,7 +958,7 @@ Public Module ClientData
             Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
         End Sub
 
-        'Updated for Version #5 'Added violation sends for fuckups.
+        'Updated for Version #4.2 'Added violation sends for fuckups.
         Public Sub CMSG_PACKET_LOGON(ByRef packet As PacketClass, ByRef Client As ClientClass)
             If Client.HUB_AUTHORIZED Then 'Tryed to logon again after allready loging on
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME, packet.Length, (packet.Length - packet.Offset))
@@ -989,9 +1000,12 @@ Public Module ClientData
             Dim response As New PacketClass(OPCODES.PACKET_LOGON)
             response.AddInt32(HUB_RESPONCE)
             Client.HUB_AUTHORIZED = True 'If the users password is accepted then
-            'If packet.ProtocalVersion >= 5 Then                     'Version 5
+            'If packet.ProtocalVersion >= 4.2 Then                     'Version 4.2
+            'If Client.
+            'Dim ThisIP() As Byte = Client.IP.GetAddressBytes
             '    response.AddInt8(Client.IP.GetAddressBytes.Length)  'IPv4|IPv6 Packet Update
-            'End If                                                  'this will only send to users version 5+
+            'Else                                                    'this will only send to users version 4.2+
+            'End If
             response.AddByteArray(Client.IP.GetAddressBytes)
             Client.Send(response)
             Debug.Print("CMSG_PACKET_LOGON" & vbNewLine)
