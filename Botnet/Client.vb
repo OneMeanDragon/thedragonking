@@ -49,6 +49,10 @@ Public Module ClientData
         Public Flags As Long = 0
         Public COMMUNICATION_VERSION As Long = 0
         Public CLIENT_CAPABILITIES As Long = 0
+        ' *******************************
+        ' *     Protocol Emulating      * is this user on botnet or bnet or etc...
+        Public PROTOCOL As PROTOCOL_ID '* ud
+        ' *******************************
     End Class
 
     Class ClientClass
@@ -275,10 +279,19 @@ Public Module ClientData
                     Else
                         'notify everyone else user logged off
                         If cliTemp.Value.LoggedIn Then 'only if they are loggedin
+                            'SELECT CASE PROTOCOLS
+                            '   CASE PROTOCAL_ID.BOTNET
                             Dim leave As New PacketClass(sOPCODES.PACKET_USERLOGGINGOFF)
                             leave.AddInt32(AccountUniqueID)
                             leave.AddInt32(&H7) '0x7??
                             cliTemp.Value.Send(leave)
+                            '       EXIT SELECT
+                            '   CASE PROTOCOL_ID.B_NET
+                            '   CASE PROTOCOL_ID.BN_FTP
+                            '   CASE PROTOCOL_ID.BN_TELNET
+                            '   CASE PROTOCOL_ID.IRC
+                            '   CASE ELSE 'DO NOTHING UNKNOWEN CLIENT ID
+                            'END SELECT
                         End If
                     End If
                 Next
@@ -300,10 +313,12 @@ Public Module ClientData
             ConnectionsDecrement()
         End Sub
         Public Sub Delete()
-            On Error Resume Next
-            Me.KeepAliveTimer.Enabled = False
-            'Me.Socket = Nothing
-            Me.Dispose()
+            Try
+                Me.KeepAliveTimer.Enabled = False
+                Me.Dispose()
+            Catch Ex As Exception
+                MessageBox.Show(Ex.ToString, "Error, void Delete() { .. }")
+            End Try
         End Sub
 
         Public Sub IntializePacketHandlers()

@@ -240,6 +240,7 @@ Public Module Packets
             Return tmpString
         End Function
         Public Sub Dispose() Implements System.IDisposable.Dispose
+            '
         End Sub
     End Class
     Public Class UpdatePacketClass
