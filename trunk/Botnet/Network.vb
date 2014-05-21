@@ -26,7 +26,6 @@ Public Module Network
         Private m_Socket As Socket
         Public Sub New()
             Try
-                'AddressFamily.InterNetwork
                 m_Socket = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
                 m_Socket.Bind(New IPEndPoint(IPAddress.Any, 21845))
                 m_Socket.Listen(5)

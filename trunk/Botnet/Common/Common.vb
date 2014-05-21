@@ -37,4 +37,10 @@ Public Module Common
         Next
         Return False 'if it gets here the hubid didnt exist in the folder
     End Function
+
+    Public Enum PROTOCOL_ID
+        BOTNET = 0
+        BNET = 1
+
+    End Enum
 End Module
