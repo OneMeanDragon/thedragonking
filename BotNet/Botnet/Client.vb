@@ -120,11 +120,13 @@ Public Module ClientData
             ConnectionsIncrement()
         End Sub
 
-        'TODO: Fix data recieve currently it is possible to overrun the buffer
+        Private SocketLoopData() As Byte
+        Private SocketLoopDataLength As Integer
         Public Sub OnData(ByVal ar As IAsyncResult)
             If Socket Is Nothing Then Return
             If Not Socket.Connected Then Return
             If WS.m_flagStopListen Then Return
+            Dim PacketLen As Integer
 
             Try
                 SocketBytes = Socket.EndReceive(ar)
@@ -133,35 +135,36 @@ Public Module ClientData
                 Else
                     Interlocked.Add(DataTransferIn, SocketBytes)
 
-                    While SocketBytes > 0
-                        'If Encryption Then Decode(SocketBuffer)
-
-                        'Calculate Length from packet
-                        Dim PacketLen As Integer = (SocketBuffer(2) + SocketBuffer(3) * 256) '+ 2
-
-                        If SocketBytes < PacketLen Then
-                            Debug.Print("CRITICAL, [" & IP.ToString & ":" & Port & "] BAD PACKET " & SocketBytes & "(" & PacketLen & ") bytes. ")
+                    ReDim Preserve SocketLoopData(SocketLoopDataLength + SocketBytes) 'need to keep track of them incomplete packets
+                    'Copy the socket data into the socket loop data
+                    Array.Copy(SocketBuffer, 0, SocketLoopData, SocketLoopDataLength, SocketBytes)
+                    SocketLoopDataLength += SocketBytes 'add the socket length to the loop data length
+                    While SocketLoopDataLength > 0
+                        If SocketLoopDataLength >= 4 Then
+                            PacketLen = (SocketLoopData(2) + SocketLoopData(3) * 256)
+                        Else
+                            PacketLen = 0 'this means we have an incomplete packet in the buffer more data should be incoming.
                         End If
-
-                        'Move packet to Data
-                        Dim data(PacketLen) As Byte ' - 1) As Byte
-                        Array.Copy(SocketBuffer, data, PacketLen)
-
-                        'Create packet and add it to queue
-                        Dim p As New PacketClass(data)
-                        If p.OpCode <> OPCODES.PACKET_IDLE Then
-                            KeepAliveTimer.Enabled = False
-                            KeepAliveTimer.Interval = 120000
-                            KeepAliveTimer.Enabled = True
+                        If PacketLen > 0 Then 'put all looping data in here
+                            'Move packet to Data
+                            Dim data(PacketLen - 1) As Byte
+                            Array.Copy(SocketLoopData, data, PacketLen)
+                            'Create packet and add it to queue
+                            Dim p As New PacketClass(data)
+                            If p.OpCode <> OPCODES.PACKET_IDLE Then
+                                KeepAliveTimer.Enabled = False
+                                KeepAliveTimer.Interval = 120000
+                                KeepAliveTimer.Enabled = True
+                            End If
+                            SyncLock Queue.SyncRoot
+                                Queue.Enqueue(p)
+                            End SyncLock
+                            'Delete packet from buffer
+                            SocketLoopDataLength -= PacketLen
+                            Array.Copy(SocketLoopData, PacketLen, SocketLoopData, 0, SocketLoopDataLength)
+                        Else
+                            'do nothing continue recieveing
                         End If
-                        SyncLock Queue.SyncRoot
-                            Queue.Enqueue(p)
-                        End SyncLock
-
-                        'Delete packet from buffer
-                        SocketBytes -= PacketLen
-                        Array.Copy(SocketBuffer, PacketLen, SocketBuffer, 0, SocketBytes)
-
                     End While
 
                     Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
