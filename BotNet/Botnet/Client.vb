@@ -119,6 +119,8 @@ Public Module ClientData
 
             ConnectionsIncrement()
         End Sub
+
+        'TODO: Fix data recieve currently it is possible to overrun the buffer
         Public Sub OnData(ByVal ar As IAsyncResult)
             If Socket Is Nothing Then Return
             If Not Socket.Connected Then Return
@@ -735,9 +737,9 @@ Public Module ClientData
                             Dim joined As New PacketClass(OPCODES.PACKET_USERINFO)
                             joined.AddInt32(Client.AccountUniqueID)
                             '4.1 here
-                            joined.AddInt32(GetDatabaseFlag(Client.Account))
-                            joined.AddInt32(GetAccountFlag(Client.Account))
-                            'TODO:
+                            joined.AddInt32(GetDatabaseFlag(Client.Account))    'is not sent if you dont sit on versoin 1 capabillity = all
+                            joined.AddInt32(GetAccountFlag(Client.Account))     'is not sent if you dont sit on versoin 1 capabillity = all
+                            'TODO: 'is not sent unless your an admin (guessing also set to version 1 capabillity = all)
                             'If ((cliTemp.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
                             '   joined.AddByteArray(Client.IP.GetAddressBytes())
                             'End If
