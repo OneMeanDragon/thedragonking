@@ -47,8 +47,15 @@ Public Module ClientData
         Public Authorized As Boolean = False
         Public LoggedIn As Boolean = False
         Public Flags As Long = 0
-        Public COMMUNICATION_VERSION As Long = 0
-        Public CLIENT_CAPABILITIES As Long = 0
+        'Public COMMUNICATION_VERSION As UInt32 = 0
+        Public CLIENT_CAPABILITIES As UInt32 = 0
+        Public Enum SERVER_VERSION
+            DEFAULT_RV = 0 'Default COMMUNICATION_VERSION
+            REVISION_1 = 1 'Version 1 supports all packets 0x00 through 0x0b.
+            REVISION_2 = 2 'Version 2 supports messages 0x0c And 0x0d.
+            REVISION_4 = 4 'Version 4 supports message 0xa to server.
+        End Enum
+        Public COMMUNICATION_VERSION As SERVER_VERSION = SERVER_VERSION.DEFAULT_RV
         ' *******************************
         ' *     Protocol Emulating      * is this user on botnet or bnet or etc...
         Public PROTOCOL As PROTOCOL_ID '* ud
@@ -522,8 +529,24 @@ Public Module ClientData
             'Response: The server updates the communication version and sends 0x9 to the
             '	client.  Message 0xa may be sent at any time, and may be resent if the
             '	client desires to change the negotiation version.
-            Client.COMMUNICATION_VERSION = packet.GetInt32
-            Client.CLIENT_CAPABILITIES = packet.GetInt32
+            If packet.Length >= 8 Then 'data after the header
+                Dim tmpComunVer As Int32 = packet.GetInt32
+                Select Case tmpComunVer
+                    Case SERVER_VERSION.REVISION_1
+                        tmpComunVer = SERVER_VERSION.REVISION_1
+                    Case SERVER_VERSION.REVISION_2
+                        tmpComunVer = SERVER_VERSION.REVISION_2
+                    Case SERVER_VERSION.REVISION_4
+                        tmpComunVer = SERVER_VERSION.REVISION_4
+                    Case Else
+                        tmpComunVer = SERVER_VERSION.DEFAULT_RV
+                End Select
+                Client.COMMUNICATION_VERSION = tmpComunVer
+            End If
+            If packet.Length >= 12 Then
+                Client.CLIENT_CAPABILITIES = packet.GetInt32
+            End If
+
             '(send to client) id 0x09: acknowledge communication version
             'Contents:
             '	(DWORD) communication version.  This message is sent to confirm
@@ -633,8 +656,10 @@ Public Module ClientData
                         '	(STRING) command
                         'Response: None.
                         Dim sendcommand As New PacketClass(OPCODES.PACKET_MESSAGE)
-                        sendcommand.AddInt32(Client.AccountUniqueID)                    '4.1
-                        sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE)  '4.1
+                        If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                            sendcommand.AddInt32(Client.AccountUniqueID)                    '4.1
+                            sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE)  '4.1
+                        End If
                         sendcommand.AddString(Client.Account)
                         sendcommand.AddString(command)
                         cliTemp.Value.Send(sendcommand)
@@ -691,8 +716,10 @@ Public Module ClientData
                         '	(STRING) command
                         'Response: None.
                         Dim sendcommand As New PacketClass(OPCODES.PACKET_MESSAGE)
-                        sendcommand.AddInt32(Client.AccountUniqueID)                                '4.1
-                        sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT)   '4.1
+                        If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                            sendcommand.AddInt32(Client.AccountUniqueID)                                '4.1
+                            sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT)   '4.1
+                        End If
                         sendcommand.AddString(Client.Account)
                         sendcommand.AddString(command)
                         cliTemp.Value.Send(sendcommand)
@@ -740,12 +767,15 @@ Public Module ClientData
                             Dim joined As New PacketClass(OPCODES.PACKET_USERINFO)
                             joined.AddInt32(Client.AccountUniqueID)
                             '4.1 here
-                            joined.AddInt32(GetDatabaseFlag(Client.Account))    'is not sent if you dont sit on versoin 1 capabillity = all
-                            joined.AddInt32(GetAccountFlag(Client.Account))     'is not sent if you dont sit on versoin 1 capabillity = all
-                            'TODO: 'is not sent unless your an admin (guessing also set to version 1 capabillity = all)
-                            'If ((cliTemp.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                            '   joined.AddByteArray(Client.IP.GetAddressBytes())
-                            'End If
+                            If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                                joined.AddInt32(GetDatabaseFlag(Client.Account))    'is not sent if you dont sit on versoin 1 capabillity = all
+                                joined.AddInt32(GetAccountFlag(Client.Account))     'is not sent if you dont sit on versoin 1 capabillity = all
+                                'TODO: 'is not sent unless your an admin (guessing also set to version 1 capabillity = all)
+                                'If ((cliTemp.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                                '   joined.AddByteArray(Client.IP.GetAddressBytes())
+                                'End If
+                            End If
+
                             joined.AddString(Client.BattleNetName)
                             joined.AddString(Client.BattleNetChannel)
                             joined.AddInt32(Client.BattleNetIP)
@@ -762,12 +792,15 @@ Public Module ClientData
                             Dim ImLoggedInResponse As New PacketClass(OPCODES.PACKET_USERINFO)
                             ImLoggedInResponse.AddInt32(imLoggedIn.Value.AccountUniqueID)
                             '4.1 here
-                            ImLoggedInResponse.AddInt32(GetDatabaseFlag(imLoggedIn.Value.Account))
-                            ImLoggedInResponse.AddInt32(GetAccountFlag(imLoggedIn.Value.Account))
-                            'TODO:
-                            'If ((imLoggedIn.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((imLoggedIn.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                            '   ImLoggedInResponse.AddByteArray(imLoggedIn.IP.GetAddressBytes())
-                            'End If
+                            If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                                ImLoggedInResponse.AddInt32(GetDatabaseFlag(imLoggedIn.Value.Account))
+                                ImLoggedInResponse.AddInt32(GetAccountFlag(imLoggedIn.Value.Account))
+                                'TODO:
+                                'If ((imLoggedIn.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((imLoggedIn.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                                '   ImLoggedInResponse.AddByteArray(imLoggedIn.IP.GetAddressBytes())
+                                'End If
+                            End If
+
                             ImLoggedInResponse.AddString(imLoggedIn.Value.BattleNetName)
                             ImLoggedInResponse.AddString(imLoggedIn.Value.BattleNetChannel)
                             ImLoggedInResponse.AddInt32(imLoggedIn.Value.BattleNetIP)
@@ -783,11 +816,13 @@ Public Module ClientData
                                 Dim response As New PacketClass(OPCODES.PACKET_USERINFO)
                                 response.AddInt32(cliTemp2.Value.AccountUniqueID)
                                 '4.1 here
-                                response.AddInt32(GetDatabaseFlag(cliTemp2.Value.Account))
-                                response.AddInt32(GetAccountFlag(cliTemp2.Value.Account))
-                                'If ((cliTemp2.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp2.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                                '   response.AddByteArray(cliTemp2.IP.GetAddressBytes())
-                                'End If
+                                If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                                    response.AddInt32(GetDatabaseFlag(cliTemp2.Value.Account))
+                                    response.AddInt32(GetAccountFlag(cliTemp2.Value.Account))
+                                    'If ((cliTemp2.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp2.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                                    '   response.AddByteArray(cliTemp2.IP.GetAddressBytes())
+                                    'End If
+                                End If
                                 response.AddString(cliTemp2.Value.BattleNetName)
                                 response.AddString(cliTemp2.Value.BattleNetChannel)
                                 response.AddInt32(cliTemp2.Value.BattleNetIP)
