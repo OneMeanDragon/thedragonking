@@ -251,7 +251,10 @@ Public Module ClientData
             If Socket Is Nothing Then
                 Debug.Print(Me.AccountUniqueID & ":" & "bad socket?")
             End If
-            If Not Socket.Connected Then Exit Sub
+            If Not Socket.Connected Then
+                Delete() 'remove the client
+                Exit Sub
+            End If
 
             Try
                 Socket.BeginSend(packet.Data, 0, packet.Data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
@@ -747,10 +750,28 @@ Public Module ClientData
                 Return
             End If
         End Sub
+        Private Sub SEND_PACKET_USERINFO(ByRef ToClient As ClientClass, ByVal FromClient As ClientClass)
+            Dim response As New PacketClass(OPCODES.PACKET_USERINFO)
+            response.AddInt32(FromClient.AccountUniqueID)
+            If ToClient.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                response.AddInt32(GetDatabaseFlag(FromClient.Account))
+                response.AddInt32(GetAccountFlag(FromClient.Account))
+                If ((ToClient.AccountFlag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.AccountFlag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
+                    response.AddByteArray(FromClient.IP.GetAddressBytes())
+                End If
+                response.AddString(FromClient.BattleNetName)
+                response.AddString(FromClient.BattleNetChannel)
+                response.AddInt32(FromClient.BattleNetIP)
+                response.AddString(FromClient.Account)
+                response.AddString(FromClient.DatabaseAccountID)
+                ToClient.Send(response)
+            End If
+        End Sub
 
         Public Sub CMSG_PACKET_USERINFO(ByRef packet As PacketClass, ByRef Client As ClientClass)
             If Client.Authorized Then
                 If Client.LoggedIn = False Then
+                    Client.LoggedIn = True
                     'Log them in send everyone else the update
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                         If cliTemp.Value.LoggedIn = False Then
@@ -779,78 +800,17 @@ Public Module ClientData
                             '	(2) (STRING:16) unique account name
                             '	(3) (STRING:*) database
 #End Region
-
-                            Dim joined As New PacketClass(OPCODES.PACKET_USERINFO)
-                            joined.AddInt32(Client.AccountUniqueID)
-                            '4.1 here
-                            If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                                joined.AddInt32(GetDatabaseFlag(Client.Account))    'is not sent if you dont sit on version 1 capabillity = all
-                                joined.AddInt32(GetAccountFlag(Client.Account))     'is not sent if you dont sit on version 1 capabillity = all
-                                'A+L
-                                'TODO: 'is not sent unless your an admin (guessing also set to version 1 capabillity = all)
-                                'If ((cliTemp.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                                '   joined.AddByteArray(Client.IP.GetAddressBytes())
-                                'End If
-                            End If
-
-                            joined.AddString(Client.BattleNetName)
-                            joined.AddString(Client.BattleNetChannel)
-                            joined.AddInt32(Client.BattleNetIP)
-                            joined.AddString(Client.Account)
-                            joined.AddString(Client.DatabaseAccountID)
-                            cliTemp.Value.Send(joined)
+                            SEND_PACKET_USERINFO(cliTemp.Value, Client)
                         End If
                     Next
                     'log client in, send client user details of those that are on the server.
-                    Client.LoggedIn = True
-                    'send to self first
-                    'Why was I looping through to find myself, we are in the client that were looking for.
-                    'OPTIONAL TODO: put this client at the front of the listing then this section of code is un-needed
-                    '# For Each imLoggedIn As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                    '# If imLoggedIn.Value.AccountUniqueID = Client.AccountUniqueID Then
-                    Dim ImLoggedInResponse As New PacketClass(OPCODES.PACKET_USERINFO)
-                    ImLoggedInResponse.AddInt32(Client.AccountUniqueID)
-                    '4.1 here
-                    If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                        ImLoggedInResponse.AddInt32(GetDatabaseFlag(Client.Account))
-                        ImLoggedInResponse.AddInt32(GetAccountFlag(Client.Account))
-                        'A+L
-                        'TODO:
-                        'If ((imLoggedIn.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((imLoggedIn.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                        '   ImLoggedInResponse.AddByteArray(imLoggedIn.IP.GetAddressBytes())
-                        'End If
-                    End If
-
-                    ImLoggedInResponse.AddString(Client.BattleNetName)
-                    ImLoggedInResponse.AddString(Client.BattleNetChannel)
-                    ImLoggedInResponse.AddInt32(Client.BattleNetIP)
-                    ImLoggedInResponse.AddString(Client.Account)
-                    ImLoggedInResponse.AddString(Client.DatabaseAccountID)
-                    Client.Send(ImLoggedInResponse)
-                    '# Exit For
-                    '# End If
-                    '# Next
+                    'Client.LoggedIn = True
+                    'SEND_PACKET_USERINFO(Client, Client) 'the above loop should do this now
 
                     For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                         If Not (cliTemp2.Value.LoggedIn = False) Then
                             If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
-                                Dim response As New PacketClass(OPCODES.PACKET_USERINFO)
-                                response.AddInt32(cliTemp2.Value.AccountUniqueID)
-                                '4.1 here
-                                If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                                    response.AddInt32(GetDatabaseFlag(cliTemp2.Value.Account))
-                                    response.AddInt32(GetAccountFlag(cliTemp2.Value.Account))
-                                    'A+L
-                                    'If ((cliTemp2.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp2.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                                    '   response.AddByteArray(cliTemp2.IP.GetAddressBytes())
-                                    'End If
-                                End If
-                                response.AddString(cliTemp2.Value.BattleNetName)
-                                response.AddString(cliTemp2.Value.BattleNetChannel)
-                                response.AddInt32(cliTemp2.Value.BattleNetIP)
-                                response.AddString(cliTemp2.Value.Account)
-                                response.AddString(cliTemp2.Value.DatabaseAccountID)
-                                Client.Send(response)
+                                SEND_PACKET_USERINFO(Client, cliTemp2.Value)
                             End If
                         End If
                     Next
