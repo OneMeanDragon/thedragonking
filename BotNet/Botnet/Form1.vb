@@ -5,6 +5,7 @@ Imports System.IO
 Imports System.Net
 Imports System.Reflection
 Imports System.Runtime.CompilerServices
+Imports System.ComponentModel
 
 Public Class Form1
 
@@ -63,11 +64,17 @@ Public Class Form1
 
         Dim currentDomain As AppDomain = AppDomain.CurrentDomain
         AddHandler currentDomain.UnhandledException, AddressOf GenericExceptionHandler
+        AddHandler currentDomain.ProcessExit, AddressOf ApplicationTerminating
 
         WS = New WorldServerClass
         GC.Collect()
 
         Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.High
+    End Sub
+
+    Private Sub ApplicationTerminating(ByVal sender As Object, ByVal e As EventArgs)
+        'neat trick here heh
+        Return
     End Sub
 
     Private Sub GenericExceptionHandler(ByVal sender As Object, ByVal e As UnhandledExceptionEventArgs)
@@ -86,4 +93,10 @@ Public Class Form1
     Private Sub Timer1_Tick(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles Timer1.Tick
         lbMemory.Text = "Used memory: " & Format(GC.GetTotalMemory(True), "### ### ### ### ##0 bytes")
     End Sub
+
+    Private Sub Form1_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        'Cleanup
+        WS.Dispose()
+    End Sub
+
 End Class

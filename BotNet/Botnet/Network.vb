@@ -40,7 +40,7 @@ Public Module Network
         Protected Sub AcceptConnection(ByVal ar As IAsyncResult)
             If m_flagStopListen Then Return
 
-            Dim m_Client As New ClientClass
+            Dim m_Client As New ClientClass()
             m_Client.Socket = m_Socket.EndAccept(ar)
             'Thread.Sleep(100)
             'MessageBox.Show((m_Client.Socket Is m_Socket).ToString())
@@ -55,8 +55,14 @@ Public Module Network
 
 
         Public Sub Dispose() Implements IDisposable.Dispose
+            'stop listen
             m_flagStopListen = True
             m_Socket.Close()
+
+            'Drop all clients.
+            While Not CLIENTs.Count = 0
+                CLIENTs.First.Value.Delete()
+            End While
         End Sub
         <SecurityPermissionAttribute(SecurityAction.Demand, Flags:=SecurityPermissionFlag.Infrastructure)> _
         Public Overrides Function InitializeLifetimeService() As Object
