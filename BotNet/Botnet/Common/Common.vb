@@ -2,10 +2,43 @@
 
 Public Module Common
     Public ApplicationsPath As String
+    Public DatabasePath As String
+    Public AccountsPath As String
     Public Const DBFolder As String = "database\"
+    Public Const UserFolder As String = "users\"
     Public Const FileHub As String = "hub.txt"
-    Public Const FileAccounts As String = "accounts.txt"
+    Public Const FileAccounts As String = "account.txt"
     Public Const DEFAULT_HUB_ID As String = "Public"
+
+#Region "File / Folder IO"
+    Public Function CreateFile(ByVal strFile As String) As Boolean
+        Try
+            If Not File.Exists(strFile) Then
+                File.Create(strFile)            'Create the file.
+                Return File.Exists(strFile)     'Check if the file created or not.
+            End If
+            Return False                        'File already exists
+        Catch ex As Exception
+            Return False                        'Error creating file
+        End Try
+        Return False                            'Creation Failed some other reason (Should not get here)
+    End Function
+
+    Public Function CreateFolder(ByVal strFolder As String) As Boolean
+        Try
+            If Not Directory.Exists(strFolder) Then
+                Directory.CreateDirectory(strFolder)    'Create the folder
+                Return Directory.Exists(strFolder)      'Now check if it created the folder or not and return.
+            End If
+            Return False                                'Folder already exists
+        Catch ex As Exception
+            Return False                                'Error creating folder
+        End Try
+        Return False                                    'Creation Failed some other reason (Should not get here)
+    End Function
+
+
+#End Region
 
     Public Function ValidateHubAccount(ByVal HUB_ID_VALUE As String, ByVal HUB_PASSWORD As String) As Boolean
         Dim HubLocation As String = ApplicationsPath & DBFolder & FileHub
