@@ -48,6 +48,6 @@ Public Class Form1
     End Sub
 
     Private Sub Timer1_Tick(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles Timer1.Tick
-        lbMemory.Text = "Used memory: " & Format(GC.GetTotalMemory(True), "### ### ##0 bytes")
+        lbMemory.Text = "Used memory: " & Format(GC.GetTotalMemory(True), "### ### ### ### ##0 bytes")
     End Sub
 End Class

@@ -228,82 +228,82 @@ Public Module Functions
         For i = 0 To (sstrFlagsToAdd.Length - 1)
             Select Case (sstrFlagsToAdd.ToUpper)(i)
                 Case "A"
-                    If (CurrentFlag And FLAGS.A) = FLAGS.A Then flagsOut += FLAGS.A
+                    If (CurrentFlag And FLAGS.A) = FLAGS.A Then flagsOut -= FLAGS.A
                     Exit Select
                 Case "B"
-                    If (CurrentFlag And FLAGS.B) = FLAGS.B Then flagsOut += FLAGS.B
+                    If (CurrentFlag And FLAGS.B) = FLAGS.B Then flagsOut -= FLAGS.B
                     Exit Select
                 Case "C"
-                    If (CurrentFlag And FLAGS.C) = FLAGS.C Then flagsOut += FLAGS.C
+                    If (CurrentFlag And FLAGS.C) = FLAGS.C Then flagsOut -= FLAGS.C
                     Exit Select
                 Case "D"
-                    If (CurrentFlag And FLAGS.D) = FLAGS.D Then flagsOut += FLAGS.D
+                    If (CurrentFlag And FLAGS.D) = FLAGS.D Then flagsOut -= FLAGS.D
                     Exit Select
                 Case "E"
-                    If (CurrentFlag And FLAGS.E) = FLAGS.E Then flagsOut += FLAGS.E
+                    If (CurrentFlag And FLAGS.E) = FLAGS.E Then flagsOut -= FLAGS.E
                     Exit Select
                 Case "F"
-                    If (CurrentFlag And FLAGS.F) = FLAGS.F Then flagsOut += FLAGS.F
+                    If (CurrentFlag And FLAGS.F) = FLAGS.F Then flagsOut -= FLAGS.F
                     Exit Select
                 Case "G"
-                    If (CurrentFlag And FLAGS.G) = FLAGS.G Then flagsOut += FLAGS.G
+                    If (CurrentFlag And FLAGS.G) = FLAGS.G Then flagsOut -= FLAGS.G
                     Exit Select
                 Case "H"
-                    If (CurrentFlag And FLAGS.H) = FLAGS.H Then flagsOut += FLAGS.H
+                    If (CurrentFlag And FLAGS.H) = FLAGS.H Then flagsOut -= FLAGS.H
                     Exit Select
                 Case "I"
-                    If (CurrentFlag And FLAGS.I) = FLAGS.I Then flagsOut += FLAGS.I
+                    If (CurrentFlag And FLAGS.I) = FLAGS.I Then flagsOut -= FLAGS.I
                     Exit Select
                 Case "J"
-                    If (CurrentFlag And FLAGS.J) = FLAGS.J Then flagsOut += FLAGS.J
+                    If (CurrentFlag And FLAGS.J) = FLAGS.J Then flagsOut -= FLAGS.J
                     Exit Select
                 Case "K"
-                    If (CurrentFlag And FLAGS.K) = FLAGS.K Then flagsOut += FLAGS.K
+                    If (CurrentFlag And FLAGS.K) = FLAGS.K Then flagsOut -= FLAGS.K
                     Exit Select
                 Case "L"
-                    If (CurrentFlag And FLAGS.L) = FLAGS.L Then flagsOut += FLAGS.L
+                    If (CurrentFlag And FLAGS.L) = FLAGS.L Then flagsOut -= FLAGS.L
                     Exit Select
                 Case "M"
-                    If (CurrentFlag And FLAGS.M) = FLAGS.M Then flagsOut += FLAGS.M
+                    If (CurrentFlag And FLAGS.M) = FLAGS.M Then flagsOut -= FLAGS.M
                     Exit Select
                 Case "N"
-                    If (CurrentFlag And FLAGS.N) = FLAGS.N Then flagsOut += FLAGS.N
+                    If (CurrentFlag And FLAGS.N) = FLAGS.N Then flagsOut -= FLAGS.N
                     Exit Select
                 Case "O"
-                    If (CurrentFlag And FLAGS.O) = FLAGS.O Then flagsOut += FLAGS.O
+                    If (CurrentFlag And FLAGS.O) = FLAGS.O Then flagsOut -= FLAGS.O
                     Exit Select
                 Case "P"
-                    If (CurrentFlag And FLAGS.P) = FLAGS.P Then flagsOut += FLAGS.P
+                    If (CurrentFlag And FLAGS.P) = FLAGS.P Then flagsOut -= FLAGS.P
                     Exit Select
                 Case "Q"
-                    If (CurrentFlag And FLAGS.Q) = FLAGS.Q Then flagsOut += FLAGS.Q
+                    If (CurrentFlag And FLAGS.Q) = FLAGS.Q Then flagsOut -= FLAGS.Q
                     Exit Select
                 Case "R"
-                    If (CurrentFlag And FLAGS.R) = FLAGS.R Then flagsOut += FLAGS.R
+                    If (CurrentFlag And FLAGS.R) = FLAGS.R Then flagsOut -= FLAGS.R
                     Exit Select
                 Case "S"
-                    If (CurrentFlag And FLAGS.S) = FLAGS.S Then flagsOut += FLAGS.S
+                    If (CurrentFlag And FLAGS.S) = FLAGS.S Then flagsOut -= FLAGS.S
                     Exit Select
                 Case "T"
-                    If (CurrentFlag And FLAGS.T) = FLAGS.T Then flagsOut += FLAGS.T
+                    If (CurrentFlag And FLAGS.T) = FLAGS.T Then flagsOut -= FLAGS.T
                     Exit Select
                 Case "U"
-                    If (CurrentFlag And FLAGS.U) = FLAGS.U Then flagsOut += FLAGS.U
+                    If (CurrentFlag And FLAGS.U) = FLAGS.U Then flagsOut -= FLAGS.U
                     Exit Select
                 Case "V"
-                    If (CurrentFlag And FLAGS.V) = FLAGS.V Then flagsOut += FLAGS.V
+                    If (CurrentFlag And FLAGS.V) = FLAGS.V Then flagsOut -= FLAGS.V
                     Exit Select
                 Case "W"
-                    If (CurrentFlag And FLAGS.W) = FLAGS.W Then flagsOut += FLAGS.W
+                    If (CurrentFlag And FLAGS.W) = FLAGS.W Then flagsOut -= FLAGS.W
                     Exit Select
                 Case "X"
-                    If (CurrentFlag And FLAGS.X) = FLAGS.X Then flagsOut += FLAGS.X
+                    If (CurrentFlag And FLAGS.X) = FLAGS.X Then flagsOut -= FLAGS.X
                     Exit Select
                 Case "Y"
-                    If (CurrentFlag And FLAGS.Y) = FLAGS.Y Then flagsOut += FLAGS.Y
+                    If (CurrentFlag And FLAGS.Y) = FLAGS.Y Then flagsOut -= FLAGS.Y
                     Exit Select
                 Case "Z"
-                    If (CurrentFlag And FLAGS.Z) = FLAGS.Z Then flagsOut += FLAGS.Z
+                    If (CurrentFlag And FLAGS.Z) = FLAGS.Z Then flagsOut -= FLAGS.Z
                     Exit Select
             End Select
         Next

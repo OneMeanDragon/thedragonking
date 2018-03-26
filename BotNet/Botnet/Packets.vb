@@ -25,7 +25,7 @@ Public Module Packets
     Public PacketHandlers As New Dictionary(Of OPCODES, HandlePacket)
     Delegate Sub HandlePacket(ByRef Packet As PacketClass, ByRef Client As ClientClass)
 #End Region
-    Public Const BOTNET_PROTO_VERSION As Integer = 4
+    Public Const BOTNET_PROTO_VERSION As Integer = 1
 
     Public Class PacketClass
         Implements IDisposable

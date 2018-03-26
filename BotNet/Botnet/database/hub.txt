@@ -2,3 +2,4 @@ public%*%
 fe%*%
 hukchat%*%
 StealthBot%*%
+BNETDocs%BotAuthorAccess%

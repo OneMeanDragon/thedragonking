@@ -178,12 +178,25 @@ Public Module ClientData
 
                     ThreadPool.QueueUserWorkItem(AddressOf OnPacket)
                 End If
-            Catch Err As Exception
+
+            Catch sckerr As SocketException
+                Select Case sckerr.NativeErrorCode
+                    Case 10054 'Connection was closed at remote end point. (Remote Peer)
 #If DEBUG Then
-                'NOTE: If it's a error here it means the connection is closed?
-                Debug.Print("WARNING, [" & IP.ToString & ":" & Port & "] cause error " & Err.ToString)
+                        Debug.Print("WARNING, [" & IP.ToString & ":" & Port & "] " & sckerr.Message)
 #End If
+                        Exit Select
+                End Select
                 Me.Dispose()
+                Exit Try
+
+            Catch err As Exception
+#If DEBUG Then
+                Debug.Print("WARNING, [" & IP.ToString & ":" & Port & "] cause error " & err.ToString)
+#End If
+
+                Me.Dispose()
+
             End Try
         End Sub
         <MethodImplAttribute(MethodImplOptions.Synchronized)> _
@@ -743,6 +756,7 @@ Public Module ClientData
                         If cliTemp.Value.LoggedIn = False Then
                             'do nothing do not send to the user logging in
                         Else
+#Region "Botnet Notes"
                             'notify everyone else user logged on
                             '	(DWORD) bot id
                             '	(4.1) (DWORD) database access flags
@@ -764,12 +778,15 @@ Public Module ClientData
                             '	(DWORD) bot server
                             '	(2) (STRING:16) unique account name
                             '	(3) (STRING:*) database
+#End Region
+
                             Dim joined As New PacketClass(OPCODES.PACKET_USERINFO)
                             joined.AddInt32(Client.AccountUniqueID)
                             '4.1 here
                             If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                                joined.AddInt32(GetDatabaseFlag(Client.Account))    'is not sent if you dont sit on versoin 1 capabillity = all
-                                joined.AddInt32(GetAccountFlag(Client.Account))     'is not sent if you dont sit on versoin 1 capabillity = all
+                                joined.AddInt32(GetDatabaseFlag(Client.Account))    'is not sent if you dont sit on version 1 capabillity = all
+                                joined.AddInt32(GetAccountFlag(Client.Account))     'is not sent if you dont sit on version 1 capabillity = all
+                                'A+L
                                 'TODO: 'is not sent unless your an admin (guessing also set to version 1 capabillity = all)
                                 'If ((cliTemp.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
                                 '   joined.AddByteArray(Client.IP.GetAddressBytes())
@@ -787,29 +804,33 @@ Public Module ClientData
                     'log client in, send client user details of those that are on the server.
                     Client.LoggedIn = True
                     'send to self first
-                    For Each imLoggedIn As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If imLoggedIn.Value.AccountUniqueID = Client.AccountUniqueID Then
-                            Dim ImLoggedInResponse As New PacketClass(OPCODES.PACKET_USERINFO)
-                            ImLoggedInResponse.AddInt32(imLoggedIn.Value.AccountUniqueID)
-                            '4.1 here
-                            If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                                ImLoggedInResponse.AddInt32(GetDatabaseFlag(imLoggedIn.Value.Account))
-                                ImLoggedInResponse.AddInt32(GetAccountFlag(imLoggedIn.Value.Account))
-                                'TODO:
-                                'If ((imLoggedIn.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((imLoggedIn.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
-                                '   ImLoggedInResponse.AddByteArray(imLoggedIn.IP.GetAddressBytes())
-                                'End If
-                            End If
+                    'Why was I looping through to find myself, we are in the client that were looking for.
+                    'OPTIONAL TODO: put this client at the front of the listing then this section of code is un-needed
+                    '# For Each imLoggedIn As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                    '# If imLoggedIn.Value.AccountUniqueID = Client.AccountUniqueID Then
+                    Dim ImLoggedInResponse As New PacketClass(OPCODES.PACKET_USERINFO)
+                    ImLoggedInResponse.AddInt32(Client.AccountUniqueID)
+                    '4.1 here
+                    If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                        ImLoggedInResponse.AddInt32(GetDatabaseFlag(Client.Account))
+                        ImLoggedInResponse.AddInt32(GetAccountFlag(Client.Account))
+                        'A+L
+                        'TODO:
+                        'If ((imLoggedIn.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((imLoggedIn.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
+                        '   ImLoggedInResponse.AddByteArray(imLoggedIn.IP.GetAddressBytes())
+                        'End If
+                    End If
 
-                            ImLoggedInResponse.AddString(imLoggedIn.Value.BattleNetName)
-                            ImLoggedInResponse.AddString(imLoggedIn.Value.BattleNetChannel)
-                            ImLoggedInResponse.AddInt32(imLoggedIn.Value.BattleNetIP)
-                            ImLoggedInResponse.AddString(imLoggedIn.Value.Account)
-                            ImLoggedInResponse.AddString(imLoggedIn.Value.DatabaseAccountID)
-                            Client.Send(ImLoggedInResponse)
-                            Exit For
-                        End If
-                    Next
+                    ImLoggedInResponse.AddString(Client.BattleNetName)
+                    ImLoggedInResponse.AddString(Client.BattleNetChannel)
+                    ImLoggedInResponse.AddInt32(Client.BattleNetIP)
+                    ImLoggedInResponse.AddString(Client.Account)
+                    ImLoggedInResponse.AddString(Client.DatabaseAccountID)
+                    Client.Send(ImLoggedInResponse)
+                    '# Exit For
+                    '# End If
+                    '# Next
+
                     For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                         If Not (cliTemp2.Value.LoggedIn = False) Then
                             If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
@@ -819,6 +840,7 @@ Public Module ClientData
                                 If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
                                     response.AddInt32(GetDatabaseFlag(cliTemp2.Value.Account))
                                     response.AddInt32(GetAccountFlag(cliTemp2.Value.Account))
+                                    'A+L
                                     'If ((cliTemp2.Value.AccountFlag And FLAGS.A_) = FLAGS.A_) Or ((cliTemp2.Value.AccountFlag And FLAGS.L_) = FLAGS.L_) Then
                                     '   response.AddByteArray(cliTemp2.IP.GetAddressBytes())
                                     'End If
@@ -832,7 +854,7 @@ Public Module ClientData
                             End If
                         End If
                     Next
-
+                    'TODO: Send the voided 0x6, /END_NAMES
                 Else
                     '
                 End If
