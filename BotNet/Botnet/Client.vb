@@ -759,13 +759,13 @@ Public Module ClientData
                 If ((ToClient.AccountFlag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.AccountFlag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
                     response.AddByteArray(FromClient.IP.GetAddressBytes())
                 End If
-                response.AddString(FromClient.BattleNetName)
-                response.AddString(FromClient.BattleNetChannel)
-                response.AddInt32(FromClient.BattleNetIP)
-                response.AddString(FromClient.Account)
-                response.AddString(FromClient.DatabaseAccountID)
-                ToClient.Send(response)
             End If
+            response.AddString(FromClient.BattleNetName)
+            response.AddString(FromClient.BattleNetChannel)
+            response.AddInt32(FromClient.BattleNetIP)
+            response.AddString(FromClient.Account)
+            response.AddString(FromClient.DatabaseAccountID)
+            ToClient.Send(response)
         End Sub
 
         Public Sub CMSG_PACKET_USERINFO(ByRef packet As PacketClass, ByRef Client As ClientClass)
