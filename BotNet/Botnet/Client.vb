@@ -854,7 +854,9 @@ Public Module ClientData
                             End If
                         End If
                     Next
-                    'TODO: Send the voided 0x6, /END_NAMES
+                    'Question here, is this sent everytime this list is requested or just on the inital server join.
+                    Dim end_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
+                    Client.Send(end_of_userlisting)
                 Else
                     '
                 End If
