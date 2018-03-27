@@ -12,7 +12,22 @@ Public Module Common
     Public Const BanTimer As String = "bantimer.txt"
     Public Const DEFAULT_HUB_ID As String = "Public"
 
+    Public Enum STRING_LENGTHS
+        ACCOUNT_LENGTH = 16
+        PASSWORD_LENGTH = 96
+    End Enum
+
 #Region "File / Folder IO"
+    Public Function GetAccountFlags(ByVal strPath As String) As Long
+        Dim sr As StreamReader = New StreamReader(strPath & "\" & FileAccounts)
+        Dim outBuf As String = sr.ReadToEnd()
+        sr.Close()
+        sr = Nothing
+        If outBuf = "" Then
+            Return 0
+        End If
+        Return GetFlagFromString(outBuf)
+    End Function
     Public Function GetPassword(ByVal strPath As String) As String
         Dim sr As StreamReader = New StreamReader(strPath & AccountPassDat)
         Dim outBuf As String = sr.ReadToEnd()

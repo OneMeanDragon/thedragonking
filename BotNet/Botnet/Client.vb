@@ -759,7 +759,7 @@ Public Module ClientData
             response.AddInt32(FromClient.AccountUniqueID)
             If ToClient.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
                 response.AddInt32(GetDatabaseFlag(FromClient.Account))
-                response.AddInt32(GetAccountFlag(FromClient.Account))
+                response.AddInt32(FromClient.AccountFlag) 'Added
                 If ((ToClient.AccountFlag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.AccountFlag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
                     response.AddByteArray(FromClient.IP.GetAddressBytes())
                 End If
@@ -850,7 +850,6 @@ Public Module ClientData
             Next
         End Sub
 
-        'TODO: setup an actuall database
         Public Sub CMSG_PACKET_ACCOUNT(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Dim command As Integer = packet.GetInt32
             If (command < 0) Or (command > 2) Then
@@ -872,23 +871,22 @@ Public Module ClientData
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_USERNAME, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
+                    If accName.Length > STRING_LENGTHS.ACCOUNT_LENGTH Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.USERNAME_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
                     Dim UserIsLoggedOn As Boolean = IsUserNameOnLine(accName)
                     accPass = packet.GetString
                     If accPass = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
-                    'VALIDATE ACCOUNT:
-                    'Dim ValidatedAccount As Boolean = "USER_PASSWORD_CORRECT"
-                    'If UserIsLoggedOn And ValidatedAccount Then
-                    '    KickUser(accName)
-                    'Else
-                    '    If Not ValidatedAccount Then
-                    '        Me.Delete()
-                    '        Return
-                    '    End If
-                    'End If
+                    If accPass.Length > STRING_LENGTHS.PASSWORD_LENGTH Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PASSWORD_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
 
+                    'TODO: If a user is online on the same name kick them... theres no reason to have "<No Account>" people running around, seriously make another account for the second login.
 
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
                     Dim tmpPath As String = AccountsPath & accName & "\"
@@ -900,12 +898,13 @@ Public Module ClientData
                             Client.Authorized = True 'If the users password is accepted then
                             Client.Account = accName
                             Client.Password = accPass
+                            Client.AccountFlag = GetAccountFlags(AccountsPath & Client.Account)
                         Else
                             response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
                         End If
                     End If
-
                     Client.Send(response)
+
                 Case PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD
                     'For Command 0x01 (Change password):
                     '(STRING) 	 Account name
@@ -938,7 +937,7 @@ Public Module ClientData
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_USERNAME, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
-                    If accName.Length > 16 Then
+                    If accName.Length > STRING_LENGTHS.ACCOUNT_LENGTH Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.USERNAME_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
@@ -948,7 +947,7 @@ Public Module ClientData
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
-                    If accPass.Length > 96 Then
+                    If accPass.Length > STRING_LENGTHS.PASSWORD_LENGTH Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PASSWORD_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If

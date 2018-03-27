@@ -75,9 +75,7 @@ Public Module Functions
     Public Function GetDatabaseFlag(ByVal inName As String) As Long
         Return &H4
     End Function
-    Public Function GetAccountFlag(ByVal inName As String) As Long
-        Return FLAGS.S
-    End Function
+
     Public Enum FLAGS
         A = &H1
         B = &H2
@@ -137,8 +135,95 @@ Public Module Functions
         'if flag = "" then need to figure out a default flag for a user
         Return tmpOut
     End Function
+    Public Function GetFlagFromString(ByVal inflags As String) As Long
+        Dim CurrentFlag As Long = 0
+        Dim i As Int32 = 0
+        For i = 0 To (inflags.Length - 1)
+            Select Case (inflags.ToUpper)(i)
+                Case "A"
+                    If (CurrentFlag And FLAGS.A) = FLAGS.A Then Exit Select
+                    CurrentFlag += FLAGS.A
+                Case "B"
+                    If (CurrentFlag And FLAGS.B) = FLAGS.B Then Exit Select
+                    CurrentFlag += FLAGS.B
+                Case "C"
+                    If (CurrentFlag And FLAGS.C) = FLAGS.C Then Exit Select
+                    CurrentFlag += FLAGS.C
+                Case "D"
+                    If (CurrentFlag And FLAGS.D) = FLAGS.D Then Exit Select
+                    CurrentFlag += FLAGS.D
+                Case "E"
+                    If (CurrentFlag And FLAGS.E) = FLAGS.E Then Exit Select
+                    CurrentFlag += FLAGS.E
+                Case "F"
+                    If (CurrentFlag And FLAGS.F) = FLAGS.F Then Exit Select
+                    CurrentFlag += FLAGS.F
+                Case "G"
+                    If (CurrentFlag And FLAGS.G) = FLAGS.G Then Exit Select
+                    CurrentFlag += FLAGS.G
+                Case "H"
+                    If (CurrentFlag And FLAGS.H) = FLAGS.H Then Exit Select
+                    CurrentFlag += FLAGS.H
+                Case "I"
+                    If (CurrentFlag And FLAGS.I) = FLAGS.I Then Exit Select
+                    CurrentFlag += FLAGS.I
+                Case "J"
+                    If (CurrentFlag And FLAGS.J) = FLAGS.J Then Exit Select
+                    CurrentFlag += FLAGS.J
+                Case "K"
+                    If (CurrentFlag And FLAGS.K) = FLAGS.K Then Exit Select
+                    CurrentFlag += FLAGS.K
+                Case "L"
+                    If (CurrentFlag And FLAGS.L) = FLAGS.L Then Exit Select
+                    CurrentFlag += FLAGS.L
+                Case "M"
+                    If (CurrentFlag And FLAGS.M) = FLAGS.M Then Exit Select
+                    CurrentFlag += FLAGS.M
+                Case "N"
+                    If (CurrentFlag And FLAGS.N) = FLAGS.N Then Exit Select
+                    CurrentFlag += FLAGS.N
+                Case "O"
+                    If (CurrentFlag And FLAGS.O) = FLAGS.O Then Exit Select
+                    CurrentFlag += FLAGS.O
+                Case "P"
+                    If (CurrentFlag And FLAGS.P) = FLAGS.P Then Exit Select
+                    CurrentFlag += FLAGS.P
+                Case "Q"
+                    If (CurrentFlag And FLAGS.Q) = FLAGS.Q Then Exit Select
+                    CurrentFlag += FLAGS.Q
+                Case "R"
+                    If (CurrentFlag And FLAGS.R) = FLAGS.R Then Exit Select
+                    CurrentFlag += FLAGS.R
+                Case "S"
+                    If (CurrentFlag And FLAGS.S) = FLAGS.S Then Exit Select
+                    CurrentFlag += FLAGS.S
+                Case "T"
+                    If (CurrentFlag And FLAGS.T) = FLAGS.T Then Exit Select
+                    CurrentFlag += FLAGS.T
+                Case "U"
+                    If (CurrentFlag And FLAGS.U) = FLAGS.U Then Exit Select
+                    CurrentFlag += FLAGS.U
+                Case "V"
+                    If (CurrentFlag And FLAGS.V) = FLAGS.V Then Exit Select
+                    CurrentFlag += FLAGS.V
+                Case "W"
+                    If (CurrentFlag And FLAGS.W) = FLAGS.W Then Exit Select
+                    CurrentFlag += FLAGS.W
+                Case "X"
+                    If (CurrentFlag And FLAGS.X) = FLAGS.X Then Exit Select
+                    CurrentFlag += FLAGS.X
+                Case "Y"
+                    If (CurrentFlag And FLAGS.Y) = FLAGS.Y Then Exit Select
+                    CurrentFlag += FLAGS.Y
+                Case "Z"
+                    If (CurrentFlag And FLAGS.Z) = FLAGS.Z Then Exit Select
+                    CurrentFlag += FLAGS.Z
+            End Select
+        Next
+        Return CurrentFlag
+    End Function
     Public Function AddFlagsToUser(ByVal CurrentFlag As Long, ByVal sstrFlagsToAdd As String) As Long
-        Dim i As Integer, flagsOut As Long
+        Dim i As Integer, flagsOut As Long = 0
         For i = 0 To (sstrFlagsToAdd.Length - 1)
             Select Case (sstrFlagsToAdd.ToUpper)(i)
                 Case "A"
