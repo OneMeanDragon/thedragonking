@@ -72,10 +72,6 @@ Public Module Functions
         '#End If
     End Sub
 
-    Public Function GetDatabaseFlag(ByVal inName As String) As Long
-        Return &H4
-    End Function
-
     Public Enum FLAGS
         A = &H1
         B = &H2

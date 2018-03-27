@@ -22,10 +22,10 @@ Public Module Common
 #Region "File / Folder IO"
     Public Function GetDatabaseFlags(ByVal database As String, ByVal username As String)
         'Check if user exists in the db in question if not create the file since they have access.
-        Dim strFile As String = DBAccounts & database & "\" & username & ".txt"
+        Dim strFile As String = DBAccountsPath & database & "\" & username & ".txt"
         If Not File.Exists(strFile) Then
             If CreateFile(strFile) Then
-                WriteLineToFile(strFile, "A") 'A here means read only
+                WriteLineToFile(strFile, "C") 'A here means read only
             End If
         End If
         Dim sr As StreamReader = New StreamReader(strFile)
@@ -33,12 +33,12 @@ Public Module Common
         sr.Close()
         sr = Nothing
         If outBuf = "" Then
-            Return 1 'Read only
+            Return 4 'Restricted
         End If
         Return GetFlagFromString(outBuf)
     End Function
     Public Function GetDatabasePass(ByVal database As String) As String
-        Dim strFolder As String = DBAccounts & database & "\"
+        Dim strFolder As String = DBAccountsPath & database & "\pass\"
         'first of all does the database in question exist.
         If Not Directory.Exists(strFolder) Then
             Return "" 'If the db dosent exist 

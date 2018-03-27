@@ -27,7 +27,7 @@ Public Class Form1
                 Return False 'creation failed
             End If
         End If
-        DBAccountsPath = DatabasePath & DBFolder
+        DBAccountsPath = DatabasePath & DBAccounts
         If Not Directory.Exists(DBAccountsPath) Then
             If Not CreateFolder(DBAccountsPath) Then
                 Return False 'creation failed

@@ -42,6 +42,7 @@ Public Module ClientData
         Public IsCycleing As Long = 0
         Public DatabaseAccountID As String = ""
         Public DatabaseAccountPass As String = ""
+        Public DatabaseFlags As Long = 0
         Public AccountUniqueID As Long = 0
         Public ChatDrop As Integer
         Public Authorized As Boolean = False
@@ -763,7 +764,7 @@ Public Module ClientData
             Dim response As New PacketClass(OPCODES.PACKET_USERINFO)
             response.AddInt32(FromClient.AccountUniqueID)
             If ToClient.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                response.AddInt32(GetDatabaseFlag(FromClient.Account))
+                response.AddInt32(FromClient.DatabaseFlags)
                 response.AddInt32(FromClient.AccountFlag) 'Added
                 If ((ToClient.AccountFlag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.AccountFlag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
                     response.AddByteArray(FromClient.IP.GetAddressBytes())
@@ -1035,19 +1036,22 @@ Public Module ClientData
             'Check if the database info matches if not then fail.
             Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
             If Client.DatabaseAccountPass = GetDatabasePass(Client.DatabaseAccountID) Then
+                Client.DatabaseFlags = GetDatabaseFlags(Client.DatabaseAccountID, Client.Account)
                 response.AddInt32(STATS_UPDATE.ACCEPTED)
+                Client.Send(response)
             Else
                 response.AddInt32(STATS_UPDATE.FAIL)
+                Client.Send(response)
+                'only check for this if status_update.fail
+                '#############################
+                'if this user isnt logged in to the userlist already, graceful kick them
+                '#############################
+                If Not Client.LoggedIn Then 'if this is true they are on the userlist already
+                    PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.DATABASE_INFO_DID_NOT_MATCH, packet.Length, (packet.Offset - 4)) '-4 = go back before the cycling dword
+                    Return
+                End If
             End If
-            Client.Send(response)
 
-            '#############################
-            'if this user isnt logged in to the userlist already, graceful kick them
-            '#############################
-            If Not Client.LoggedIn Then 'if this is true they are on the userlist already
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.DATABASE_INFO_DID_NOT_MATCH, packet.Length, (packet.Offset - 4)) '-4 = go back before the cycling dword
-                Return
-            End If
 
             Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
             '##############################
