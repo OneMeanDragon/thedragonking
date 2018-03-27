@@ -4,7 +4,9 @@ Public Module Common
     Public ApplicationsPath As String
     Public DatabasePath As String
     Public AccountsPath As String
+    Public DBAccountsPath As String
     Public Const DBFolder As String = "database\"
+    Public Const DBAccounts As String = "db\"
     Public Const UserFolder As String = "users\"
     Public Const FileHub As String = "hub.txt"
     Public Const FileAccounts As String = "account.txt"
@@ -18,6 +20,35 @@ Public Module Common
     End Enum
 
 #Region "File / Folder IO"
+    Public Function GetDatabaseFlags(ByVal database As String, ByVal username As String)
+        'Check if user exists in the db in question if not create the file since they have access.
+        Dim strFile As String = DBAccounts & database & "\" & username & ".txt"
+        If Not File.Exists(strFile) Then
+            If CreateFile(strFile) Then
+                WriteLineToFile(strFile, "A") 'A here means read only
+            End If
+        End If
+        Dim sr As StreamReader = New StreamReader(strFile)
+        Dim outBuf As String = sr.ReadToEnd()
+        sr.Close()
+        sr = Nothing
+        If outBuf = "" Then
+            Return 1 'Read only
+        End If
+        Return GetFlagFromString(outBuf)
+    End Function
+    Public Function GetDatabasePass(ByVal database As String) As String
+        Dim strFolder As String = DBAccounts & database & "\"
+        'first of all does the database in question exist.
+        If Not Directory.Exists(strFolder) Then
+            Return "" 'If the db dosent exist 
+        End If
+        Dim sr As StreamReader = New StreamReader(strFolder & AccountPassDat)
+        Dim outBuf As String = sr.ReadToEnd()
+        sr.Close()
+        sr = Nothing
+        Return outBuf
+    End Function
     Public Function GetAccountFlags(ByVal strPath As String) As Long
         Dim sr As StreamReader = New StreamReader(strPath & "\" & FileAccounts)
         Dim outBuf As String = sr.ReadToEnd()

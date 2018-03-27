@@ -385,6 +385,10 @@ Public Module ClientData
             Debug.Print("LogType.WARNING, [" & Client.IP.ToString & ":" & Client.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
         End Sub
 #Region "Response Enumerators"
+        Private Enum STATS_UPDATE
+            FAIL = 0
+            ACCEPTED = 1
+        End Enum
         Private Enum HUB_ID_RESPONCES
             FAIL = 0
             ACCEPTED = 1
@@ -424,6 +428,7 @@ Public Module ClientData
             BAD_SERVER_IP = 11
             BADLYFORMED_BATTLENET_NAME = 12
             BADLYFORMED_DATABASE_STRING = 13
+            DATABASE_INFO_DID_NOT_MATCH = 14
         End Enum
         Private Enum PROTOCOL_VIOLATION_COMMAND_3
             MISSING_SUBCOMMAND = 2
@@ -775,6 +780,8 @@ Public Module ClientData
         Public Sub CMSG_PACKET_USERINFO(ByRef packet As PacketClass, ByRef Client As ClientClass)
             If Client.Authorized Then
                 If Client.LoggedIn = False Then
+
+
                     Client.LoggedIn = True
                     'Log them in send everyone else the update
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
@@ -1025,12 +1032,34 @@ Public Module ClientData
                 Return
             End If
 
+            'Check if the database info matches if not then fail.
             Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
-            'to do: check database if account+pass match
-            response.AddInt32(1) '1=sucess 0=fail 'currently allways success
+            If Client.DatabaseAccountPass = GetDatabasePass(Client.DatabaseAccountID) Then
+                response.AddInt32(STATS_UPDATE.ACCEPTED)
+            Else
+                response.AddInt32(STATS_UPDATE.FAIL)
+            End If
             Client.Send(response)
 
+            '#############################
+            'if this user isnt logged in to the userlist already, graceful kick them
+            '#############################
+            If Not Client.LoggedIn Then 'if this is true they are on the userlist already
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.DATABASE_INFO_DID_NOT_MATCH, packet.Length, (packet.Offset - 4)) '-4 = go back before the cycling dword
+                Return
+            End If
+
             Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
+            '##############################
+            'Send the update message to those cycling users.
+            '##############################
+            For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                If cliTemp2.Value.LoggedIn And (cliTemp2.Value.IsCycleing = 1) Then 'if this user is logged in and is cycling
+                    If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
+                        SEND_PACKET_USERINFO(cliTemp2.Value, Client)
+                    End If
+                End If
+            Next
         End Sub
 
         'Updated for Version #4.2 'Added violation sends for fuckups.
