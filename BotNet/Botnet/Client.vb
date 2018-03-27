@@ -502,6 +502,10 @@ Public Module ClientData
             EMPTY_PASSWORD = 6
             SC1_MISSING_NEWPASSWORD = 7
             SC1_EMPTY_NEWPASSWORD = 8
+            ACCOUNT_CREATION_FAIL = 9
+            ACCOUNT_CREATION_ACCOUNT_EXISTS = 10
+            USERNAME_BAD_LENGTH = 11
+            PASSWORD_BAD_LENGTH = 12
         End Enum
 #End Region
 #End Region
@@ -884,12 +888,23 @@ Public Module ClientData
                     '        Return
                     '    End If
                     'End If
-                    response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
 
-                    response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
-                    Client.Authorized = True 'If the users password is accepted then
-                    Client.Account = accName
-                    Client.Password = accPass
+
+                    response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
+                    Dim tmpPath As String = AccountsPath & accName & "\"
+                    If Not Directory.Exists(tmpPath) Then 'Account dosent exist.
+                        response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                    Else 'test password
+                        If accPass = GetPassword(tmpPath) Then
+                            response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
+                            Client.Authorized = True 'If the users password is accepted then
+                            Client.Account = accName
+                            Client.Password = accPass
+                        Else
+                            response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                        End If
+                    End If
+
                     Client.Send(response)
                 Case PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD
                     'For Command 0x01 (Change password):
@@ -923,19 +938,41 @@ Public Module ClientData
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_USERNAME, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
+                    If accName.Length > 16 Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.USERNAME_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
+
                     accPass = packet.GetString
                     If accPass = "" Then
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.EMPTY_PASSWORD, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
+                    If accPass.Length > 96 Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PASSWORD_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
+
+                    Dim tmpPath As String = AccountsPath & accName & "\"
+                    If Directory.Exists(tmpPath) Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.ACCOUNT_CREATION_ACCOUNT_EXISTS, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
+
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.CREATE_ACCOUNT)
-                    response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
-                    'Client.Authorized = True 'If the users password is accepted then
+                    If Not CreateAccount(tmpPath, accPass) Then 'if the files still failed to create then account creation = fail
+                        response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                        'if Client.COMMUNICATION_VERSION >= 2 then
+                        '   response.AddInt32(FailReason)
+                        'end if
+                    Else
+                        response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
+                    End If
                     Client.Account = accName
                     Client.Password = accPass
                     Client.Send(response)
                 Case Else
-                    '
+                    Me.Delete() 'Unknowen command kill connection TODO: [Medium Priority] Temp ban 45seconds
             End Select
             Debug.Print("CMSG_PACKET_ACCOUNT" & vbNewLine)
         End Sub

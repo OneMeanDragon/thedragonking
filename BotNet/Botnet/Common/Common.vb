@@ -8,13 +8,58 @@ Public Module Common
     Public Const UserFolder As String = "users\"
     Public Const FileHub As String = "hub.txt"
     Public Const FileAccounts As String = "account.txt"
+    Public Const AccountPassDat As String = "pass.txt"
+    Public Const BanTimer As String = "bantimer.txt"
     Public Const DEFAULT_HUB_ID As String = "Public"
 
 #Region "File / Folder IO"
+    Public Function GetPassword(ByVal strPath As String) As String
+        Dim sr As StreamReader = New StreamReader(strPath & AccountPassDat)
+        Dim outBuf As String = sr.ReadToEnd()
+        sr.Close()
+        sr = Nothing
+        Return outBuf
+    End Function
+    Private Sub WriteLineToFile(ByVal strPath As String, ByVal message As String)
+        Dim xfile As System.IO.StreamWriter
+        xfile = My.Computer.FileSystem.OpenTextFileWriter(strPath, True)
+
+        xfile.Write(message)
+        xfile.Close()
+        xfile = Nothing
+    End Sub
+    Public Function CreateAccount(ByVal strPath As String, ByVal password As String) As Boolean
+        'check dir, do we need to create it?
+        If Not Directory.Exists(strPath) Then
+            If Not CreateFolder(strPath) Then
+                Return False 'couldent create the folder.....
+            End If
+        End If
+        'check all files needed for this account.
+        If Not File.Exists(strPath & FileAccounts) Then
+            If Not CreateFile(strPath & FileAccounts) Then
+                Return False 'couldent create the account file.....
+            End If
+        End If
+        If Not File.Exists(strPath & AccountPassDat) Then
+            If Not CreateFile(strPath & AccountPassDat) Then
+                Return False 'couldent create the account file.....
+            End If
+        End If
+        If Not File.Exists(strPath & BanTimer) Then
+            If Not CreateFile(strPath & BanTimer) Then
+                Return False 'couldent create the account file.....
+            End If
+        End If
+        WriteLineToFile(strPath & AccountPassDat, password)
+        Return True
+    End Function
+
     Public Function CreateFile(ByVal strFile As String) As Boolean
         Try
             If Not File.Exists(strFile) Then
-                File.Create(strFile)            'Create the file.
+                Dim fs As FileStream = File.Create(strFile)            'Create the file.
+                fs.Close()
                 Return File.Exists(strFile)     'Check if the file created or not.
             End If
             Return False                        'File already exists
