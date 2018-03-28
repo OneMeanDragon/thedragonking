@@ -1038,6 +1038,9 @@ Public Module ClientData
             If Client.DatabaseAccountPass = GetDatabasePass(Client.DatabaseAccountID) Then
                 Client.DatabaseFlags = GetDatabaseFlags(Client.DatabaseAccountID, Client.Account)
                 response.AddInt32(STATS_UPDATE.ACCEPTED)
+                If Client.LoggedIn Then
+                    response.AddInt32(Client.AccountFlag) 'Only way this makes sense
+                End If
                 Client.Send(response)
             Else
                 response.AddInt32(STATS_UPDATE.FAIL)
