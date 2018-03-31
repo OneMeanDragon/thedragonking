@@ -27,10 +27,10 @@ Public Module Network
         Public Sub New()
             Try
                 m_Socket = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
-                m_Socket.Bind(New IPEndPoint(IPAddress.Any, 21845))
+                m_Socket.Bind(New IPEndPoint(IPAddress.Any, 21845)) 'IPAddress.Any
                 m_Socket.Listen(5)
                 m_Socket.BeginAccept(AddressOf AcceptConnection, Nothing)
-                Debug.Print("LogType.SUCCESS Listening on " & IPAddress.Any.ToString & " on port " & 21845)
+                Debug.Print("LogType.SUCCESS Listening on " & IPAddress.Any.ToString() & " on port " & 21845) 'IPAddress.Any
 
             Catch e As Exception
                 Console.WriteLine()

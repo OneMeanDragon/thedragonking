@@ -11,6 +11,15 @@ Imports System.Runtime.CompilerServices
 Imports System.Collections.Generic
 Imports System.Security.Permissions
 
+Public Enum STATE_FLAGS
+    HUB_AUTHORIZED = &H1
+    STATUS_INITALIZED = &H2
+    FLAG_CHANGED = &H4
+    ACCOUNT_AUTHORIZED = &H8
+    ACCOUNT_LOGGED_IN = &H10
+    ACCOUNT_CYCLEING = &H20
+End Enum
+
 Public Module ClientData
     Public CLIENTs As New Dictionary(Of UInteger, ClientClass)
     Public CLIETNIDs As Long = 0
@@ -32,23 +41,27 @@ Public Module ClientData
         Public AccountFlag As Long = 0
         Public HUB_ID As String = ""
         Public HUB_PASSWORD As String = ""
-        Public HUB_AUTHORIZED As Boolean = False
+        'Public HUB_AUTHORIZED As Boolean = False 'MOVED to STATE flag system
         Public HUB_FLAG As Int32 = 0
-        'Public Account As String = ""
+
         Public Password As String = ""
         Public BattleNetName As String = ""
         Public BattleNetChannel As String = ""
         Public BattleNetIP As Long = 0
-        Public IsCycleing As Long = 0
+        'Public IsCycleing As Long = 0 'MOVED to STATE flag system
         Public DatabaseAccountID As String = ""
         Public DatabaseAccountPass As String = ""
         Public DatabaseFlags As Long = 0
         Public AccountUniqueID As Long = 0
         Public ChatDrop As Integer
-        Public Authorized As Boolean = False
-        Public LoggedIn As Boolean = False
+        'Public Authorized As Boolean = False 'MOVED to STATE flag system
+        'Public LoggedIn As Boolean = False 'MOVED to STATE flag system
         Public Flags As Long = 0
-        'Public COMMUNICATION_VERSION As UInt32 = 0
+
+        '########### Client State ############
+        Public STATE As UInt32 = 0          '#  'Required in Login process. for ease of removing bool mess.
+        '#####################################
+
         Public CLIENT_CAPABILITIES As UInt32 = 0
         Public Enum SERVER_VERSION
             DEFAULT_RV = 0 'Default COMMUNICATION_VERSION
@@ -112,12 +125,12 @@ Public Module ClientData
 
 
         Public Sub OnConnect(ByVal state As Object)
-            IP = CType(Socket.RemoteEndPoint, IPEndPoint).Address
-            Port = CType(Socket.RemoteEndPoint, IPEndPoint).Port
-            AccountUniqueID = GetUniqueID()
+            Me.IP = CType(Socket.RemoteEndPoint, IPEndPoint).Address
+            Me.Port = CType(Socket.RemoteEndPoint, IPEndPoint).Port
+            Me.AccountUniqueID = GetUniqueID()
             Debug.Print("Incomming connection from [" & IP.ToString & ":" & Port & "]")
 
-            Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
+            Me.Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
 
             Me.Index = Interlocked.Increment(CLIETNIDs)
 
@@ -301,26 +314,17 @@ Public Module ClientData
         End Sub
 
         Private Sub Dispose() Implements System.IDisposable.Dispose
-            If LoggedIn Then
+            If ((Me.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                     If cliTemp.Value.AccountUniqueID = AccountUniqueID Then
                         'do nothing do not send to the user logging off
                     Else
                         'notify everyone else user logged off
-                        If cliTemp.Value.LoggedIn Then 'only if they are loggedin
-                            'SELECT CASE PROTOCOLS
-                            '   CASE PROTOCAL_ID.BOTNET
+                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'only if they are loggedin
                             Dim leave As New PacketClass(sOPCODES.PACKET_USERLOGGINGOFF)
                             leave.AddInt32(AccountUniqueID)
                             leave.AddInt32(&H7) '0x7??
                             cliTemp.Value.Send(leave)
-                            '       EXIT SELECT
-                            '   CASE PROTOCOL_ID.B_NET
-                            '   CASE PROTOCOL_ID.BN_FTP
-                            '   CASE PROTOCOL_ID.BN_TELNET
-                            '   CASE PROTOCOL_ID.IRC
-                            '   CASE ELSE 'DO NOTHING UNKNOWEN CLIENT ID
-                            'END SELECT
                         End If
                     End If
                 Next
@@ -346,7 +350,7 @@ Public Module ClientData
                 Me.KeepAliveTimer.Enabled = False
                 Me.Dispose()
             Catch Ex As Exception
-                MessageBox.Show(Ex.ToString, "Error, void Delete() { .. }")
+                MessageBox.Show(Ex.ToString, "Error, void Client.Delete() { .. }")
             End Try
         End Sub
 
@@ -430,6 +434,7 @@ Public Module ClientData
             BADLYFORMED_BATTLENET_NAME = 12
             BADLYFORMED_DATABASE_STRING = 13
             DATABASE_INFO_DID_NOT_MATCH = 14
+            BAD_STATE = 15
         End Enum
         Private Enum PROTOCOL_VIOLATION_COMMAND_3
             MISSING_SUBCOMMAND = 2
@@ -621,7 +626,7 @@ Public Module ClientData
 
         Private Sub CHAT_MESSAGE_TO_ALL_USERS(ByRef Client As ClientClass, ByVal command As Long, ByVal action As Long, ByVal message As String)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.LoggedIn Then
+                If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                     If Not (cliTemp.Value.Account = Client.Account) Then
                         Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
                         sendmessage.AddInt32(command)
@@ -636,7 +641,7 @@ Public Module ClientData
         Private Sub CHAT_MESSAGE_TO_USER(ByRef Client As ClientClass, ByVal command As Long, ByVal action As Long, ByVal userid As Long, ByVal message As String)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If cliTemp.Value.AccountUniqueID = userid Then
-                    If cliTemp.Value.LoggedIn Then
+                    If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                         Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
                         sendmessage.AddInt32(command)
                         sendmessage.AddInt32(action)
@@ -652,7 +657,7 @@ Public Module ClientData
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then
                     If Not (cliTemp.Value.Account = Client.Account) Then
-                        If cliTemp.Value.LoggedIn Then
+                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                             Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
                             sendmessage.AddInt32(command)
                             sendmessage.AddInt32(action)
@@ -669,7 +674,7 @@ Public Module ClientData
             Dim command As String = packet.GetString
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then
-                    If cliTemp.Value.LoggedIn Then
+                    If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                         'do nothing do not send to the user logging in
                         '(send to client) id 0x04: command over botnet
                         'Contents:
@@ -721,7 +726,7 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            If Not Client.LoggedIn Then
+            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
@@ -729,7 +734,7 @@ Public Module ClientData
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If cliTemp.Value.AccountUniqueID = target Then
                     tarFound = True
-                    If cliTemp.Value.LoggedIn Then
+                    If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                         'do nothing do not send to the user logging in
                         '(send to client) id 0x04: command over botnet
                         'Contents:
@@ -768,6 +773,7 @@ Public Module ClientData
                 response.AddInt32(FromClient.AccountFlag) 'Added
                 If ((ToClient.AccountFlag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.AccountFlag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
                     response.AddByteArray(FromClient.IP.GetAddressBytes())
+                    'response.AddByteArray(CType(FromClient.Socket.RemoteEndPoint, IPEndPoint).Address.GetAddressBytes())
                 End If
             End If
             response.AddString(FromClient.BattleNetName)
@@ -779,14 +785,17 @@ Public Module ClientData
         End Sub
 
         Public Sub CMSG_PACKET_USERINFO(ByRef packet As PacketClass, ByRef Client As ClientClass)
-            If Client.Authorized Then
-                If Client.LoggedIn = False Then
-
-
-                    Client.LoggedIn = True
+            If ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then
+                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                     'Log them in send everyone else the update
+                    If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Or ((Client.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                        SEND_PACKET_STATSUPDATE(Client, 1) '1 = sucess.
+                    End If
+
+                    Client.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
+
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If cliTemp.Value.LoggedIn = False Then
+                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
                             'do nothing do not send to the user logging in
                         Else
 #Region "Botnet Notes"
@@ -820,7 +829,7 @@ Public Module ClientData
                     'SEND_PACKET_USERINFO(Client, Client) 'the above loop should do this now
 
                     For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If Not (cliTemp2.Value.LoggedIn = False) Then
+                        If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                             If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
                                 SEND_PACKET_USERINFO(Client, cliTemp2.Value)
                             End If
@@ -903,11 +912,17 @@ Public Module ClientData
                     Else 'test password
                         If accPass = GetPassword(tmpPath) Then
                             response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
-                            Client.Authorized = True 'If the users password is accepted then
+                            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
+                                Client.STATE += STATE_FLAGS.ACCOUNT_AUTHORIZED
+                                Client.STATE += STATE_FLAGS.FLAG_CHANGED
+                            End If
                             Client.Account = accName
                             Client.Password = accPass
                             Client.AccountFlag = GetAccountFlags(AccountsPath & Client.Account)
                         Else
+                            If ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
+                                Client.STATE -= STATE_FLAGS.ACCOUNT_AUTHORIZED
+                            End If
                             response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
                         End If
                     End If
@@ -984,11 +999,22 @@ Public Module ClientData
             Debug.Print("CMSG_PACKET_ACCOUNT" & vbNewLine)
         End Sub
 
+        'TODO: {HIGH PRIORITY} Move sends to seperate module.
+        Private Sub SEND_PACKET_STATSUPDATE(ByRef ThisClient As ClientClass, ByVal iResponse As UInt32)
+            Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
+            response.AddInt32(iResponse)
+            If ((ThisClient.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                ThisClient.STATE -= STATE_FLAGS.FLAG_CHANGED 'send update and remove flag
+                response.AddInt32(ThisClient.AccountFlag) 'Only way this makes sense
+            End If
+            ThisClient.Send(response)
+        End Sub
+
         Public Sub CMSG_PACKET_STATSUPDATE(ByRef packet As PacketClass, ByRef Client As ClientClass)
-            If Not Client.HUB_AUTHORIZED Then
+            If Not ((Client.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.CLIENT_NOTYET_AUTHORIZED, packet.Length, (packet.Length - packet.Offset))
                 Return
-            ElseIf Not Client.Authorized Then
+            ElseIf Not ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.CLIENT_NOTYET_AUTHORIZED, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
@@ -1027,41 +1053,58 @@ Public Module ClientData
             Client.DatabaseAccountID = DatabaseData(0)
             Client.DatabaseAccountPass = tmpStr.Substring(Client.DatabaseAccountID.Length + 1) 'DatabaseData(1) 'System.Text.Encoding.UTF8.GetBytes(tmpStr.Split(" ")(1))
 
-            Client.IsCycleing = packet.GetInt32
-            If (Client.IsCycleing < 0) Or (Client.IsCycleing > 1) Then
+            Dim IsCycleing As Integer = packet.GetInt32()
+            If (IsCycleing < 0) Then 'switch to unsigned this will never happen
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BAD_DATABASE_SIZE, packet.Length, packet.Offset)
                 Return
             End If
+            If IsCycleing > 0 Then
+                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'just incase.....
+                    Client.STATE += STATE_FLAGS.ACCOUNT_CYCLEING
+                End If
+            Else
+                If ((Client.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'just incase.....
+                    Client.STATE -= STATE_FLAGS.ACCOUNT_CYCLEING
+                End If
+            End If
 
             'Check if the database info matches if not then fail.
-            Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
+            Dim iResponse As UInt32 = 0
             If Client.DatabaseAccountPass = GetDatabasePass(Client.DatabaseAccountID) Then
                 Client.DatabaseFlags = GetDatabaseFlags(Client.DatabaseAccountID, Client.Account)
-                response.AddInt32(STATS_UPDATE.ACCEPTED)
-                If Client.LoggedIn Then
-                    response.AddInt32(Client.AccountFlag) 'Only way this makes sense
+                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                    'This user is not logged in yet send once the userlist requested, so that they get their account flag.
+                    'If we got here the user has passed this section set the state and continue.
+                    If ((Client.STATE And STATE_FLAGS.STATUS_INITALIZED) = STATE_FLAGS.STATUS_INITALIZED) Then
+                        'Client has already initalized their request, shouldent get here but just incase we do.
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BAD_STATE, packet.Length, packet.Offset)
+                        Return
+                    Else
+                        'dont need to test this if we dont get here the client selfdestructs.
+                        Client.STATE += STATE_FLAGS.STATUS_INITALIZED
+                    End If
+                    Return
                 End If
-                Client.Send(response)
+
+                iResponse = STATS_UPDATE.ACCEPTED
             Else
-                response.AddInt32(STATS_UPDATE.FAIL)
-                Client.Send(response)
-                'only check for this if status_update.fail
-                '#############################
-                'if this user isnt logged in to the userlist already, graceful kick them
-                '#############################
-                If Not Client.LoggedIn Then 'if this is true they are on the userlist already
+                '#################################
+                'Failed to login to Database    '#  'removed STATS_UPDATE.Failed response.
+                '#################################
+                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this is true they are on the userlist already
                     PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.DATABASE_INFO_DID_NOT_MATCH, packet.Length, (packet.Offset - 4)) '-4 = go back before the cycling dword
                     Return
                 End If
             End If
 
+            SEND_PACKET_STATSUPDATE(Client, iResponse)
 
             Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
             '##############################
             'Send the update message to those cycling users.
             '##############################
             For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp2.Value.LoggedIn And (cliTemp2.Value.IsCycleing = 1) Then 'if this user is logged in and is cycling
+                If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) And ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'if this user is logged in and is cycling
                     If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
                         SEND_PACKET_USERINFO(cliTemp2.Value, Client)
                     End If
@@ -1071,7 +1114,7 @@ Public Module ClientData
 
         'Updated for Version #4.2 'Added violation sends for fuckups.
         Public Sub CMSG_PACKET_LOGON(ByRef packet As PacketClass, ByRef Client As ClientClass)
-            If Client.HUB_AUTHORIZED Then 'Tryed to logon again after allready loging on
+            If ((Client.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then 'Tryed to logon again after allready loging on
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
@@ -1110,7 +1153,8 @@ Public Module ClientData
 
             Dim response As New PacketClass(OPCODES.PACKET_LOGON)
             response.AddInt32(HUB_RESPONCE)
-            Client.HUB_AUTHORIZED = True 'If the users password is accepted then
+            Client.STATE += STATE_FLAGS.HUB_AUTHORIZED 'If the users password is accepted then
+
             'If packet.ProtocalVersion >= 4.2 Then                     'Version 4.2
             'If Client.
             'Dim ThisIP() As Byte = Client.IP.GetAddressBytes
