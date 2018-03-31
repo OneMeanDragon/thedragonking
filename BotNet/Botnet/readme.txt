@@ -57,7 +57,7 @@ UInt32 IsCycleing_BOOL
 
 S->C 0x02: feild
 UInt32 responce_BOOL
-UInt32 Account_Flag (not seen in initial login process)
+UInt32 Account_Flag (only seen if your account flag changes, if this DWORD is not present your prev flag hasent changed values)
 
 ----------------------------------------------------------------------------------
 
