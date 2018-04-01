@@ -585,8 +585,8 @@ Public Module ClientData
             '	this style.  That is, clients should not change parsing methods until
             '	the server confirms the new style.
             'Response:   None()
-            Dim response As New PacketClass(OPCODES.PACKET_CHANGEDBPASSWORD)
-            response.AddInt32(1) '4.0 0->1 4.1
+            Dim response As New PacketClass(OPCODES.PACKET_BOTNETVERSION_AK)
+            response.AddInt32(Client.COMMUNICATION_VERSION) '4.0 0->1 4.1
             Client.Send(response)
         End Sub
 

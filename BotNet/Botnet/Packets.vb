@@ -14,7 +14,8 @@ Public Module Packets
         PACKET_COMMAND = 8              '(0x08) 'done
         PACKET_PROTOCOL_VIOLATION = 8   '(0x08) 'done
         PACKET_CHANGEDBPASSWORD = 9     '(0x09) '
-        PACKET_BOTNETVERSION = 10       '(0x0a) '
+        PACKET_BOTNETVERSION_AK = 9     '(0x09) 'Botnet protocal request reply.
+        PACKET_BOTNETVERSION = 10       '(0x0a) 'done
         PACKET_BOTNETCHAT = 11          '(0x0b) 'done
         PACKET_ACCOUNT = 13             '(0x0d)
         PACKET_CHATDROPOPTIONS = 16     '(0x10)
