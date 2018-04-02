@@ -164,6 +164,7 @@ Public Module ClientData
                     Exit While
                 End If
             End While
+            'NOTE: The above loops can be done in 1 loop. i = 1 to client count + 1, clients.containskey(i)
             Return 0 'Since we cant unsigned a -1 and we wont ever have a client at ID = 0
         End Function
 
@@ -171,12 +172,14 @@ Public Module ClientData
         Public Sub OnConnect(ByVal state As Object)
             Me.IP = CType(Socket.RemoteEndPoint, IPEndPoint).Address
             Me.Port = CType(Socket.RemoteEndPoint, IPEndPoint).Port
-            Me.AccountUniqueID = GetUniqueID()
+            'Me.AccountUniqueID = GetUniqueID() 'NOTE: We dont need to do this it can be done via Me.Index.
             Debug.Print("Incomming connection from [" & IP.ToString & ":" & Port & "]")
+
+            Me.Index = Interlocked.Increment(CLIETNIDs)
+            Me.AccountUniqueID = Me.Index 'Testing
 
             Me.Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
 
-            Me.Index = Interlocked.Increment(CLIETNIDs)
 
             SyncLock CType(CLIENTs, ICollection).SyncRoot
                 CLIENTs.Add(Me.Index, Me)
