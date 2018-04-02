@@ -19,9 +19,31 @@ Public Enum STATE_FLAGS
     ACCOUNT_LOGGED_IN = &H10
     ACCOUNT_CYCLEING = &H20
 End Enum
+Public Enum SERVER_VERSION
+    DEFAULT_RV = 0 'Default COMMUNICATION_VERSION
+    REVISION_1 = 1 'Version 1 supports all packets 0x00 through 0x0b.
+    REVISION_2 = 2 'Version 2 supports messages 0x0c And 0x0d.
+    REVISION_4 = 4 'Version 4 supports message 0xa to server.
+End Enum
+
+#Region "Client friendly module"
+Public Module cliFunctions
+    Friend Function COMS_VER(ByVal requested_version As UInt32) As SERVER_VERSION
+        Select Case requested_version
+            Case SERVER_VERSION.REVISION_1
+                Return SERVER_VERSION.REVISION_1
+            Case SERVER_VERSION.REVISION_2
+                Return SERVER_VERSION.REVISION_2
+            Case SERVER_VERSION.REVISION_4
+                Return SERVER_VERSION.REVISION_4
+        End Select
+        Return SERVER_VERSION.DEFAULT_RV
+    End Function
+End Module
+#End Region
 
 Public Module ClientData
-    Public CLIENTs As New Dictionary(Of UInteger, ClientClass)
+    Public CLIENTs As New Dictionary(Of UInteger, ClientClass) 'TODO: [URGENT] Use the clients socket handle as their index.
     Public CLIETNIDs As Long = 0
 
     Public MAXLENGTH_HUB_ID As Integer = 32
@@ -63,13 +85,8 @@ Public Module ClientData
         '#####################################
 
         Public CLIENT_CAPABILITIES As UInt32 = 0
-        Public Enum SERVER_VERSION
-            DEFAULT_RV = 0 'Default COMMUNICATION_VERSION
-            REVISION_1 = 1 'Version 1 supports all packets 0x00 through 0x0b.
-            REVISION_2 = 2 'Version 2 supports messages 0x0c And 0x0d.
-            REVISION_4 = 4 'Version 4 supports message 0xa to server.
-        End Enum
-        Public COMMUNICATION_VERSION As SERVER_VERSION = SERVER_VERSION.DEFAULT_RV
+
+    Public COMMUNICATION_VERSION As SERVER_VERSION = SERVER_VERSION.DEFAULT_RV
         ' *******************************
         ' *     Protocol Emulating      * is this user on botnet or bnet or etc...
         Public PROTOCOL As PROTOCOL_ID '* ud
@@ -546,6 +563,11 @@ Public Module ClientData
             '	(WORD) Length of unprocessed data (length of packets which arrived after the offending packets)
         End Sub
 
+        Public Sub SMSG_PACKET_BOTNETVERSION(ByRef Client As ClientClass)
+            Dim response As New PacketClass(OPCODES.PACKET_BOTNETVERSION_AK)
+            response.AddInt32(Client.COMMUNICATION_VERSION) '4.0 0->1 4.1
+            Client.Send(response)
+        End Sub
         Public Sub CMSG_PACKET_BOTNETVERSION(ByRef packet As PacketClass, ByRef Client As ClientClass)
             '(send to server) id 0x0a: specify communication version and client
             '	capabilities
@@ -562,17 +584,8 @@ Public Module ClientData
             '	client desires to change the negotiation version.
             If packet.Length >= 8 Then 'data after the header
                 Dim tmpComunVer As Int32 = packet.GetInt32
-                Select Case tmpComunVer
-                    Case SERVER_VERSION.REVISION_1
-                        tmpComunVer = SERVER_VERSION.REVISION_1
-                    Case SERVER_VERSION.REVISION_2
-                        tmpComunVer = SERVER_VERSION.REVISION_2
-                    Case SERVER_VERSION.REVISION_4
-                        tmpComunVer = SERVER_VERSION.REVISION_4
-                    Case Else
-                        tmpComunVer = SERVER_VERSION.DEFAULT_RV
-                End Select
-                Client.COMMUNICATION_VERSION = tmpComunVer
+                Client.COMMUNICATION_VERSION = COMS_VER(tmpComunVer)
+                'Else Client.COMMUNICATION_VERSION = SERVER_VERSION.DEFAULT_RV 'this is here as a marker, the server by default is SERVER_VERSION.DEFAULT_RV
             End If
             If packet.Length >= 12 Then
                 Client.CLIENT_CAPABILITIES = packet.GetInt32
@@ -585,9 +598,7 @@ Public Module ClientData
             '	this style.  That is, clients should not change parsing methods until
             '	the server confirms the new style.
             'Response:   None()
-            Dim response As New PacketClass(OPCODES.PACKET_BOTNETVERSION_AK)
-            response.AddInt32(Client.COMMUNICATION_VERSION) '4.0 0->1 4.1
-            Client.Send(response)
+            SMSG_PACKET_BOTNETVERSION(Client)
         End Sub
 
         Public Sub CMSG_PACKET_BOTNETCHAT(ByRef packet As PacketClass, ByRef Client As ClientClass)
