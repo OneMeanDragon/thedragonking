@@ -908,6 +908,52 @@ Public Module ClientData
             Next
         End Sub
 
+        Private Function GetUserIndex(ByVal AccountName As String, Optional NotSelf As UInt32 = 0) As UInt32
+            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                If cliTemp.Value.Account.ToLower = AccountName.ToLower Then
+                    If NotSelf > 0 Then
+                        'if > 0 we passed it our index test now.
+                        If Not (cliTemp.Value.Index = NotSelf) Then
+                            'if the index is not ours we found it
+                            Return cliTemp.Value.Index
+                        End If
+                    Else
+                            Return cliTemp.Value.Index
+                    End If
+                End If
+            Next
+            Return 0 '0 = no account found using this name
+        End Function
+        Private Sub VoidUserAccount(ByVal atIndex As UInt32)
+            Dim tClient As ClientClass = CLIENTs.Item(atIndex)
+            tClient.Account = ""
+            tClient.AccountFlag = 0
+
+            'Update these users, if the account was logged on.
+            If (tClient.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then
+                For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                    If (cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then 'Not (cliTemp.Value.Index = atIndex) Then
+                        SEND_PACKET_USERINFO(cliTemp.Value, tClient)
+                    End If
+                Next
+            End If
+        End Sub
+
+        Public Sub SMSG_PACKET_ACCOUNTLI(ByRef client As ClientClass, ByVal res As UInt32, ByVal AccountName As String)
+            If Not (res = PACKET_ACCOUNT_RESULTS.FAILED) Then
+                'Check if account name is currently online, if it is void it and update the that client.
+                Dim tIndex As UInt32 = GetUserIndex(AccountName, client.Index)
+                If Not (tIndex = 0) Then
+                    'theres an account using our name void them
+                    VoidUserAccount(tIndex)
+                End If
+            End If
+
+            Dim response As New PacketClass(OPCODES.PACKET_ACCOUNT)
+            response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
+            response.AddInt32(res)
+            client.Send(response)
+        End Sub
         Public Sub CMSG_PACKET_ACCOUNT(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Dim command As Integer = packet.GetInt32
             If (command < 0) Or (command > 2) Then
@@ -946,13 +992,14 @@ Public Module ClientData
 
                     'TODO: If a user is online on the same name kick them... theres no reason to have "<No Account>" people running around, seriously make another account for the second login.
 
-                    response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
+                    'response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)**************************
                     Dim tmpPath As String = AccountsPath & accName & "\"
                     If Not Directory.Exists(tmpPath) Then 'Account dosent exist.
-                        response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                        'response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                        SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.FAILED, "")
                     Else 'test password
                         If accPass = GetPassword(tmpPath) Then
-                            response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
+                            'response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
                             If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
                                 Client.STATE += STATE_FLAGS.ACCOUNT_AUTHORIZED
                                 Client.STATE += STATE_FLAGS.FLAG_CHANGED
@@ -960,14 +1007,16 @@ Public Module ClientData
                             Client.Account = accName
                             Client.Password = accPass
                             Client.AccountFlag = GetAccountFlags(AccountsPath & Client.Account)
+                            SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.PASSED, Client.Account)
                         Else
                             If ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
                                 Client.STATE -= STATE_FLAGS.ACCOUNT_AUTHORIZED
                             End If
-                            response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                            'response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                            SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.FAILED, "")
                         End If
                     End If
-                    Client.Send(response)
+                    'Client.Send(response)
 
                 Case PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD
                     'For Command 0x01 (Change password):
@@ -1040,7 +1089,6 @@ Public Module ClientData
             Debug.Print("CMSG_PACKET_ACCOUNT" & vbNewLine)
         End Sub
 
-        'TODO: {HIGH PRIORITY} Move sends to seperate module.
         Private Sub SEND_PACKET_STATSUPDATE(ByRef ThisClient As ClientClass, ByVal iResponse As UInt32)
             Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
             response.AddInt32(iResponse)
