@@ -43,7 +43,8 @@ End Module
 #End Region
 
 Public Module ClientData
-    Public CLIENTs As New Dictionary(Of UInteger, ClientClass) 'TODO: [URGENT] Use the clients socket handle as their index.
+    Public CLIENTs As New Dictionary(Of UInteger, ClientClass) 'TODO: [N/A] Use the clients socket handle as their index. (Apparently I changed this prior to the 2011 builds go me.) 'CLIENTs.ContainsKey(index)
+
     Public CLIETNIDs As Long = 0
 
     Public MAXLENGTH_HUB_ID As Integer = 32
@@ -54,43 +55,69 @@ Public Module ClientData
     Public MAXLENGTH_COMMAND As Integer = 384
     Public MAXLENGTH_SENDER As Integer = 32
 
-    <Serializable()> _
-    Public Class ClientInfo
-        Public Index As UInteger
-        Public IP As Net.IPAddress
-        Public Port As UInteger
-        Public Account As String = ""
-        Public AccountFlag As Long = 0
-        Public HUB_ID As String = ""
-        Public HUB_PASSWORD As String = ""
-        'Public HUB_AUTHORIZED As Boolean = False 'MOVED to STATE flag system
-        Public HUB_FLAG As Int32 = 0
+    Public Structure HostInfos
+        Public IP As String         '
+        Public HostName As String   '
+    End Structure
+    Public Structure SocketInfos
+        Public sckClient As Socket  '
+        Public IP As IPAddress      '
+        Public Port As UInteger     '
+        Public Host As HostInfos    '
+    End Structure
 
-        Public Password As String = ""
-        Public BattleNetName As String = ""
-        Public BattleNetChannel As String = ""
-        Public BattleNetIP As Long = 0
-        'Public IsCycleing As Long = 0 'MOVED to STATE flag system
-        Public DatabaseAccountID As String = ""
-        Public DatabaseAccountPass As String = ""
-        Public DatabaseFlags As Long = 0
-        Public AccountUniqueID As Long = 0
-        Public ChatDrop As Integer
-        'Public Authorized As Boolean = False 'MOVED to STATE flag system
-        'Public LoggedIn As Boolean = False 'MOVED to STATE flag system
-        Public Flags As Long = 0
+    Public Structure AccountStore
+        Public Name As String
+        '<password not needed> server itself dosent need to ever store this value, since the server checks validity on the fly.
+        Public Flag As UInt32
+    End Structure
+    Public Structure BattleNStore
+        Public Name As String
+        Public Channel As String
+        Public Server As UInt32
+    End Structure
+    Public Structure BotNetStorage
+        Public ID As UInt32
+        Public STATE As UInt32
+        Public CLIENT_CAPABILITIES As UInt32
+        Public COMMUNICATION_VERSION As SERVER_VERSION
+        'Public HUB As AccountStore <not needed>
+        Public Account As AccountStore
+        Public Database As AccountStore
+        Public UserStatus As BattleNStore
+    End Structure
+
+    <Serializable()>
+    Public Class ClientInfo
+        Public Index As UInteger 'THIS NEEDS TO BE CHANGED IMMEDIATELY (Consider [Sockethandle, or AddressOf this clientclass])
+        '                        '(Apparently I changed this prior to the 2011 builds go me.) 'CLIENTs.ContainsKey(index)
+        '                                           '   _____________
+        Public IP As Net.IPAddress                  '<-| IP and PORT |
+        Public Port As UInteger                     '<-|_____________|
+        Public Account As String = ""               'TODO: Build Struct to store the minimal needed data, Move it to the client class itself.
+        Public AccountFlag As Long = 0              '
+        Public HUB_ID As String = ""                '<-- Same as account pass note
+        Public HUB_PASSWORD As String = ""          '<-- Same as account pass note
+        'Public HUB_FLAG As Int32 = 0               'Again see note for Flags.... 'Unless I had other intentions with this leaving it here commented out just incase I remember.
+
+        Public Password As String = ""              '<-- This dosent need to be stored in class, as its only checked at account login and password change level
+        Public BattleNetName As String = ""         '
+        Public BattleNetChannel As String = ""      '
+        Public BattleNetIP As Long = 0              '
+
+        Public DatabaseAccountID As String = ""     '
+        Public DatabaseAccountPass As String = ""   '
+        Public DatabaseFlags As Long = 0            '
+        Public AccountUniqueID As UInt32 = 0        'Users ID on botnet.
+        'Public ChatDrop As Integer     'To far ahead of myself < will be in the state flag >
+        'Public Flags As Long = 0       'I must have originally intended this as AccountFlag
 
         '########### Client State ############
         Public STATE As UInt32 = 0          '#  'Required in Login process. for ease of removing bool mess.
         '#####################################
 
         Public CLIENT_CAPABILITIES As UInt32 = 0
-
-    Public COMMUNICATION_VERSION As SERVER_VERSION = SERVER_VERSION.DEFAULT_RV
-        ' *******************************
-        ' *     Protocol Emulating      * is this user on botnet or bnet or etc...
-        Public PROTOCOL As PROTOCOL_ID '* ud
-        ' *******************************
+        Public COMMUNICATION_VERSION As SERVER_VERSION = SERVER_VERSION.DEFAULT_RV
     End Class
 
     Class ClientClass
@@ -118,9 +145,9 @@ Public Module ClientData
 
             Return ci
         End Function
-        Private Function GetUniqueID() As Long
+        Private Function GetUniqueID() As UInt32
             Dim IsUnique As Boolean = False
-            Dim TmpID As Long = 1
+            Dim TmpID As UInt32 = 1
             Dim IdMatch As Boolean = False
             While IsUnique = False
                 For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
@@ -137,7 +164,7 @@ Public Module ClientData
                     Exit While
                 End If
             End While
-            Return -1
+            Return 0 'Since we cant unsigned a -1 and we wont ever have a client at ID = 0
         End Function
 
 
@@ -280,7 +307,7 @@ Public Module ClientData
         Public Sub Send(ByRef packet As PacketClass)
             If packet Is Nothing Then Throw New ApplicationException("Packet doesn't contain data!")
             If Socket Is Nothing Then
-                Debug.Print(Me.AccountUniqueID & ":" & "bad socket?")
+                Debug.Print(Me.AccountUniqueID.ToString() & ":" & "bad socket?")
             End If
             If Not Socket.Connected Then
                 Delete() 'remove the client
