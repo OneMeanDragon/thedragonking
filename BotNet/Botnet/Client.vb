@@ -927,7 +927,18 @@ Public Module ClientData
         Private Sub VoidUserAccount(ByVal atIndex As UInt32)
             Dim tClient As ClientClass = CLIENTs.Item(atIndex)
             tClient.Account = ""
-            tClient.AccountFlag = 0
+
+            'Update users flag.
+            If (Not (tClient.AccountFlag = 0)) Then 'if their flag was already 0, theres no need to send the flag change.
+                If ((tClient.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                    tClient.STATE -= STATE_FLAGS.FLAG_CHANGED 'just incase
+                End If
+
+                tClient.STATE += STATE_FLAGS.FLAG_CHANGED
+                tClient.AccountFlag = 0
+                'else the user hasent been updated yet.
+                SEND_PACKET_STATSUPDATE(tClient, 1) 'Update this clients flag now.
+            End If
 
             'Update these users, if the account was logged on.
             If (tClient.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then
@@ -940,6 +951,11 @@ Public Module ClientData
         End Sub
 
         Public Sub SMSG_PACKET_ACCOUNTLI(ByRef client As ClientClass, ByVal res As UInt32, ByVal AccountName As String)
+            Dim response As New PacketClass(OPCODES.PACKET_ACCOUNT)
+            response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
+            response.AddInt32(res)
+            client.Send(response)
+
             If Not (res = PACKET_ACCOUNT_RESULTS.FAILED) Then
                 'Check if account name is currently online, if it is void it and update the that client.
                 Dim tIndex As UInt32 = GetUserIndex(AccountName, client.Index)
@@ -948,11 +964,6 @@ Public Module ClientData
                     VoidUserAccount(tIndex)
                 End If
             End If
-
-            Dim response As New PacketClass(OPCODES.PACKET_ACCOUNT)
-            response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
-            response.AddInt32(res)
-            client.Send(response)
         End Sub
         Public Sub CMSG_PACKET_ACCOUNT(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Dim command As Integer = packet.GetInt32
