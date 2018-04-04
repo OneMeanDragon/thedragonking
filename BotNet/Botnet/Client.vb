@@ -579,6 +579,7 @@ Public Module ClientData
         '	1 = unrecognized command ID.  Any other code is command specific
 
         Private Sub PROTOCOL_VIOLATION(ByRef Client As ClientClass, ByVal ErrorFrom As OPCODES, ByVal ErrorID As Integer, ByVal pLength As Long, ByVal pRemainingLen As Long)
+            Debug.Print("PROTOCOL_VIOLATION" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_PROTOCOL_VIOLATION)
             response.AddInt32(ErrorID)
             response.AddInt8(ErrorFrom)
@@ -594,11 +595,20 @@ Public Module ClientData
         End Sub
 
         Public Sub SMSG_PACKET_BOTNETVERSION(ByRef Client As ClientClass)
+            Debug.Print("SMSG_PACKET_BOTNETVERSION" & vbNewLine)
+            Dim response As New PacketClass(OPCODES.PACKET_BOTNETVERSION)
+            response.AddInt32(SERVER_VERSION.REVISION_4) '4.0 0->1 4.1
+            Client.Send(response)
+        End Sub
+
+        Public Sub SMSG_PACKET_BOTNETSUBVERSION(ByRef Client As ClientClass)
+            Debug.Print("SMSG_PACKET_BOTNETSUBVERSION" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_BOTNETVERSION_AK)
             response.AddInt32(Client.COMMUNICATION_VERSION) '4.0 0->1 4.1
             Client.Send(response)
         End Sub
         Public Sub CMSG_PACKET_BOTNETVERSION(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_BOTNETVERSION" & vbNewLine)
             '(send to server) id 0x0a: specify communication version and client
             '	capabilities
             'Contents:
@@ -628,10 +638,11 @@ Public Module ClientData
             '	this style.  That is, clients should not change parsing methods until
             '	the server confirms the new style.
             'Response:   None()
-            SMSG_PACKET_BOTNETVERSION(Client)
+            SMSG_PACKET_BOTNETSUBVERSION(Client)
         End Sub
 
         Public Sub CMSG_PACKET_BOTNETCHAT(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_BOTNETCHAT" & vbNewLine)
             '	(DWORD) command
             '		0	: message to all bots
             '		->1	: message to bots on the same database
@@ -711,6 +722,7 @@ Public Module ClientData
             Next
         End Sub
         Public Sub CMSG_PACKET_MESSAGE(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_MESSAGE" & vbNewLine)
             Dim sender As String = packet.GetString
             Dim command As String = packet.GetString
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
@@ -742,6 +754,7 @@ Public Module ClientData
             Next
         End Sub
         Public Sub CMSG_PACKET_COMMAND(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_COMMAND" & vbNewLine)
             If packet.Data.Length < 10 Then 'header+dword+null+null
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -807,6 +820,7 @@ Public Module ClientData
             End If
         End Sub
         Private Sub SEND_PACKET_USERINFO(ByRef ToClient As ClientClass, ByVal FromClient As ClientClass)
+            Debug.Print("SEND_PACKET_USERINFO" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_USERINFO)
             response.AddInt32(FromClient.AccountUniqueID)
             If ToClient.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
@@ -826,6 +840,7 @@ Public Module ClientData
         End Sub
 
         Public Sub CMSG_PACKET_USERINFO(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_USERINFO" & vbNewLine)
             If ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then
                 If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                     'Log them in send everyone else the update
@@ -834,6 +849,9 @@ Public Module ClientData
                     End If
 
                     Client.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
+
+                    Dim start_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
+                    Client.Send(start_of_userlisting) 'Why the voided packet at the start fuck sake.
 
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                         If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
@@ -928,18 +946,6 @@ Public Module ClientData
             Dim tClient As ClientClass = CLIENTs.Item(atIndex)
             tClient.Account = ""
 
-            'Update users flag.
-            If (Not (tClient.AccountFlag = 0)) Then 'if their flag was already 0, theres no need to send the flag change.
-                If ((tClient.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
-                    tClient.STATE -= STATE_FLAGS.FLAG_CHANGED 'just incase
-                End If
-
-                tClient.STATE += STATE_FLAGS.FLAG_CHANGED
-                tClient.AccountFlag = 0
-                'else the user hasent been updated yet.
-                SEND_PACKET_STATSUPDATE(tClient, 1) 'Update this clients flag now.
-            End If
-
             'Update these users, if the account was logged on.
             If (tClient.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then
                 For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
@@ -951,6 +957,9 @@ Public Module ClientData
         End Sub
 
         Public Sub SMSG_PACKET_ACCOUNTLI(ByRef client As ClientClass, ByVal res As UInt32, ByVal AccountName As String)
+            Debug.Print("SMSG_PACKET_ACCOUNTLI" & vbNewLine)
+            'Update users flag.
+
             Dim response As New PacketClass(OPCODES.PACKET_ACCOUNT)
             response.AddInt32(PACKET_ACCOUNT_COMMANDS.LOGIN)
             response.AddInt32(res)
@@ -962,10 +971,16 @@ Public Module ClientData
                 If Not (tIndex = 0) Then
                     'theres an account using our name void them
                     VoidUserAccount(tIndex)
+                    Return
+                End If
+                If ((client.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                    SEND_PACKET_STATSUPDATE(client, 1) 'Update this clients flag now.
+                    Return
                 End If
             End If
         End Sub
         Public Sub CMSG_PACKET_ACCOUNT(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_ACCOUNT" & vbNewLine)
             Dim command As Integer = packet.GetInt32
             If (command < 0) Or (command > 2) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.BAD_SUBCOMMAND, packet.Length, (packet.Length - packet.Offset))
@@ -1101,6 +1116,7 @@ Public Module ClientData
         End Sub
 
         Private Sub SEND_PACKET_STATSUPDATE(ByRef ThisClient As ClientClass, ByVal iResponse As UInt32)
+            Debug.Print("SEND_PACKET_STATSUPDATE" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
             response.AddInt32(iResponse)
             If ((ThisClient.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
@@ -1111,6 +1127,7 @@ Public Module ClientData
         End Sub
 
         Public Sub CMSG_PACKET_STATSUPDATE(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
             If Not ((Client.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.CLIENT_NOTYET_AUTHORIZED, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -1204,7 +1221,7 @@ Public Module ClientData
             'Send the update message to those cycling users.
             '##############################
             For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) And ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'if this user is logged in and is cycling
+                If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this user is logged in and is cycling
                     If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
                         SEND_PACKET_USERINFO(cliTemp2.Value, Client)
                     End If
@@ -1218,11 +1235,11 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            If packet.ProtocalVersion < BOTNET_PROTO_VERSION Then
-                Dim VerResponse As New PacketClass(OPCODES.PACKET_BOTNETVERSION)
-                VerResponse.AddInt32(BOTNET_PROTO_VERSION)
-                Client.Send(VerResponse)
-            End If
+            'If packet.ProtocalVersion < BOTNET_PROTO_VERSION Then
+            '    Dim VerResponse As New PacketClass(OPCODES.PACKET_BOTNETVERSION)
+            '    VerResponse.AddInt32(BOTNET_PROTO_VERSION)
+            '    Client.Send(VerResponse)
+            'End If
 
             Client.HUB_ID = packet.GetString
             If Client.HUB_ID.Length > MAXLENGTH_HUB_ID Then
@@ -1250,6 +1267,9 @@ Public Module ClientData
                 Me.Delete()
                 Return
             End If
+
+            'Why is this a forced packet here, forced to send 0xA for sphtbot.
+            SMSG_PACKET_BOTNETVERSION(Client)
 
             Dim response As New PacketClass(OPCODES.PACKET_LOGON)
             response.AddInt32(HUB_RESPONCE)
