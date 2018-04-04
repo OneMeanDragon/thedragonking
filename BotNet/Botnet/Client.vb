@@ -850,8 +850,8 @@ Public Module ClientData
 
                     Client.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
 
-                    Dim start_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
-                    Client.Send(start_of_userlisting) 'Why the voided packet at the start fuck sake.
+                    'Dim start_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
+                    'Client.Send(start_of_userlisting) 'Why the voided packet at the start fuck sake.
 
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                         If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
@@ -1217,9 +1217,6 @@ Public Module ClientData
             SEND_PACKET_STATSUPDATE(Client, iResponse)
 
             Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
-            '##############################
-            'Send the update message to those cycling users.
-            '##############################
             For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this user is logged in and is cycling
                     If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
