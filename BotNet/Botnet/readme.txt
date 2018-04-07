@@ -107,6 +107,42 @@ UInt32 Command
 UInt32 MSG_ACCOUNT_RESPONSE (BOOL)
 
 ----------------------------------------------------------------------------------
+Straight from the proto kp_version_1 document
+[
+    The Packet is fully supported and you can set your switches, 
+    You can also get your switches sent back to you as you have set them,
+    however is yet to be implemented into the the chat sending procedures.
+]
 
+
+(send to server) id 0x10: set chat options
+Contents:
+	(BYTE) Subcommand.  Presently only subcommand 0 is defined.
+	* Subcommand 0: chat drop options; the client may omit the
+		four bytes of data, in which case the command will not affect
+		current chat options but will still generate a notification of
+		resulting options.
+		(BYTE) setting for broadcast
+		(BYTE) setting for database
+		(BYTE) setting for whisper
+		(BYTE) refuse whispers from other databases
+		For each of the first three bytes, 0 (the default for
+		clients which do not send this message) allows all chat
+		to be received.  1 refuses chat from users who are not
+		on an account.  2 refuses all chat.  Note that messages
+		from administrators ignore these settings.  This command
+		is provided in recognition that some clients drop all
+		chat received from certain sources.  Such clients may
+		use this command to advise the server of their intent to
+		discard chat.
+Response:
+	The server sends back a message with the same subcommand.  See below for contents.
+
+(send to client) id 0x10: inform chat options
+Contents:
+	(BYTE) Subcommand.  Presently only subcommand 0 is defined.
+* Subcommand 0: chat drop options. Same contents as 0x10 to server.
+
+----------------------------------------------------------------------------------
 
 Adding bit by bit as I go over the current code.
