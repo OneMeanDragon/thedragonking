@@ -59,6 +59,23 @@ Public Module Common
         End If
         Return GetFlagFromString(outBuf)
     End Function
+    Private Sub DelFile(ByVal strPath As String)
+        Try
+            File.Delete(strPath)
+        Catch errr As IOException
+            Return 'Failed delete
+        End Try
+    End Sub
+    Public Function NewPassword(ByVal strPath As String, ByVal NewPass As String) As String
+        DelFile(strPath & AccountPassDat)
+        If Not File.Exists(strPath & AccountPassDat) Then
+            If Not CreateFile(strPath & AccountPassDat) Then
+                Return GetPassword(strPath) 'File did not delete.
+            End If
+        End If
+        WriteLineToFile(strPath & AccountPassDat, NewPass)
+        Return GetPassword(strPath) 'need to return the new value to check that the password matches said new password. [yes i know it can be done here...]
+    End Function
     Public Function GetPassword(ByVal strPath As String) As String
         Dim sr As StreamReader = New StreamReader(strPath & AccountPassDat)
         Dim outBuf As String = sr.ReadToEnd()

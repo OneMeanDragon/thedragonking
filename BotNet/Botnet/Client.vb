@@ -564,6 +564,11 @@ Public Module ClientData
             ACCOUNT_CREATION_ACCOUNT_EXISTS = 10
             USERNAME_BAD_LENGTH = 11
             PASSWORD_BAD_LENGTH = 12
+            PACKET_BAD_LENGTH = 13
+            BAD_PACKET = 14
+            ACCOUNT_CHANGEPASSWORD_ACCOUNTNONEXISTANT = 15
+            ACCOUNT_CHANGEPASSWORD_BADPASSWORD = 16
+            ACCOUNT_CHANGEPASSWORD_REQUIRESSERVERADMINHELP = 17
         End Enum
 #End Region
 #End Region
@@ -981,17 +986,56 @@ Public Module ClientData
         End Sub
         Public Sub CMSG_PACKET_ACCOUNT(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("CMSG_PACKET_ACCOUNT" & vbNewLine)
+
+#Region "Can we get the command message? [done]"
+            'there must be data passed the command aswell so yeah.
+            If packet.Length <= 8 Then
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PACKET_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+#End Region
+
             Dim command As Integer = packet.GetInt32
+
+#Region "Check for bad command [done]"
             If (command < 0) Or (command > 2) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.BAD_SUBCOMMAND, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
+#End Region
+#Region "Check for bad packet length. Length at the very least. [done]"
+            '1: (PACKET_ACCOUNT_COMMANDS.LOGIN And PACKET_ACCOUNT_COMMANDS.CREATE_ACCOUNT) = DWORD + DWORD + BYTE + BYTE [10]
+            '2: (PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD) = DWORD + DWORD + BYTE + BYTE + BYTE [11]
+            '3: else needs to be delt with at the end of the function. [Should never happen as of the above code: Bad Command?]
+            Select Case command
+                Case PACKET_ACCOUNT_COMMANDS.LOGIN
+                    If packet.Length < 10 Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PACKET_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
+                    Exit Select
+                Case PACKET_ACCOUNT_COMMANDS.CREATE_ACCOUNT
+                    If packet.Length < 10 Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PACKET_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
+                    Exit Select
+                Case PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD
+                    If packet.Length < 11 Then
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.PACKET_BAD_LENGTH, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    End If
+                    Exit Select
+            End Select
+#End Region
+
             Dim accName As String = ""
             Dim accPass As String = ""
             Dim accOldPass As String = ""
             Dim accNewPass As String = ""
             Dim response As New PacketClass(OPCODES.PACKET_ACCOUNT)
             Select Case command
+#Region "PACKET_ACCOUNT_COMMANDS.LOGIN [done]"
                 Case PACKET_ACCOUNT_COMMANDS.LOGIN
                     'For Command 0x00 (Login):
                     '(STRING) 	 Account name
@@ -1042,8 +1086,9 @@ Public Module ClientData
                             SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.FAILED, "")
                         End If
                     End If
-                    'Client.Send(response)
-
+                    Return
+#End Region
+#Region "PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD [TODO]"
                 Case PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD
                     'For Command 0x01 (Change password):
                     '(STRING) 	 Account name
@@ -1064,9 +1109,33 @@ Public Module ClientData
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.SC1_EMPTY_NEWPASSWORD, packet.Length, (packet.Length - packet.Offset))
                         Return
                     End If
+
+                    '1st Does this account even exist.
+                    Dim tmpPath As String = AccountsPath & accName & "\"
+                    If Not Directory.Exists(tmpPath) Then 'Account dosent exist.
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.ACCOUNT_CHANGEPASSWORD_ACCOUNTNONEXISTANT, packet.Length, (packet.Length - packet.Offset))
+                        Return
+                    Else '1: Check if old password matches current password, if it dosent protocol-violation boot
+                        If accOldPass = GetPassword(tmpPath) Then 'PASSWORD match prep new password.
+                            '2: Make new password, test if it was changed send accepted message.
+                            If accNewPass = NewPassword(tmpPath, accNewPass) Then
+                                'Passed, else password was not updated, or other error which will require admin help [when admin support is added].
+                            Else
+                                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.ACCOUNT_CHANGEPASSWORD_REQUIRESSERVERADMINHELP, packet.Length, (packet.Length - packet.Offset))
+                                Return
+                            End If
+                        Else 'Password did not match
+                            PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.ACCOUNT_CHANGEPASSWORD_BADPASSWORD, packet.Length, (packet.Length - packet.Offset))
+                            Return
+                        End If
+                    End If
+
                     response.AddInt32(PACKET_ACCOUNT_COMMANDS.CHANGE_PASSWORD)
-                    response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
+                    response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED) 'From here we should never manage to be a fail.
                     Client.Send(response)
+                    Return
+#End Region
+#Region "PACKET_ACCOUNT_COMMANDS.CREATE_ACCOUNT [TODO: Check for malformed name]"
                 Case PACKET_ACCOUNT_COMMANDS.CREATE_ACCOUNT
                     'For Command 0x02 (Create account):
                     '(STRING) 	 Account name
@@ -1109,10 +1178,10 @@ Public Module ClientData
                     Client.Account = accName
                     Client.Password = accPass
                     Client.Send(response)
-                Case Else
-                    Me.Delete() 'Unknowen command kill connection TODO: [Medium Priority] Temp ban 45seconds
+                    Return
+#End Region
             End Select
-            Debug.Print("CMSG_PACKET_ACCOUNT" & vbNewLine)
+            PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.BAD_PACKET, packet.Length, (packet.Length - packet.Offset))
         End Sub
 
         Private Sub SEND_PACKET_STATSUPDATE(ByRef ThisClient As ClientClass, ByVal iResponse As UInt32)
@@ -1286,7 +1355,7 @@ Public Module ClientData
         Public Sub New()
             IntializePacketHandlers()
             KeepAliveTimer = New Timers.Timer
-            KeepAliveTimer.Interval = 180000
+            KeepAliveTimer.Interval = 110000
             KeepAliveTimer.Enabled = False
         End Sub
 
