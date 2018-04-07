@@ -25,6 +25,17 @@ Public Enum SERVER_VERSION
     REVISION_2 = 2 'Version 2 supports messages 0x0c And 0x0d.
     REVISION_4 = 4 'Version 4 supports message 0xa to server.
 End Enum
+Public Enum CHAT_DROP_OPTIONS_SETTINGS
+    ALLOW_ALL = 0
+    REFUSE_FROM_NOACCOUNT = 1
+    REFUSE_ALL = 2
+End Enum
+Public Structure CHAT_DROP_OPTIONS_STRUCT
+    Public BroadCastedChat As CHAT_DROP_OPTIONS_SETTINGS 
+    Public DatabaseChat As CHAT_DROP_OPTIONS_SETTINGS
+    Public WhisperChat As CHAT_DROP_OPTIONS_SETTINGS
+    Public OtherDatabaseChat As CHAT_DROP_OPTIONS_SETTINGS
+End Structure
 
 #Region "Client friendly module"
 Public Module cliFunctions
@@ -89,26 +100,26 @@ Public Module ClientData
 
     <Serializable()>
     Public Class ClientInfo
-        Public Index As UInteger 'THIS NEEDS TO BE CHANGED IMMEDIATELY (Consider [Sockethandle, or AddressOf this clientclass])
-        '                        '(Apparently I changed this prior to the 2011 builds go me.) 'CLIENTs.ContainsKey(index)
+        Public Index As UInteger
         '                                           '   _____________
         Public IP As Net.IPAddress                  '<-| IP and PORT |
         Public Port As UInteger                     '<-|_____________|
-        Public Account As String = ""               'TODO: Build Struct to store the minimal needed data, Move it to the client class itself.
-        Public AccountFlag As Long = 0              '
-        Public HUB_ID As String = ""                '<-- Same as account pass note
-        Public HUB_PASSWORD As String = ""          '<-- Same as account pass note
-        'Public HUB_FLAG As Int32 = 0               'Again see note for Flags.... 'Unless I had other intentions with this leaving it here commented out just incase I remember.
+        Public Account As String = ""                       'TODO: Build Struct to store the minimal needed data, Move it to the client class itself.
+        Public AccountFlag As Long = 0                      '
+        Public HUB_ID As String = ""                        '<-- Same as account pass note
+        Public HUB_PASSWORD As String = ""                  '<-- Same as account pass note
+        'Public HUB_FLAG As Int32 = 0                       'Again see note for Flags.... 'Unless I had other intentions with this leaving it here commented out just incase I remember.
 
-        Public Password As String = ""              '<-- This dosent need to be stored in class, as its only checked at account login and password change level
-        Public BattleNetName As String = ""         '
-        Public BattleNetChannel As String = ""      '
-        Public BattleNetIP As Long = 0              '
+        Public Password As String = ""                      '<-- This dosent need to be stored in class, as its only checked at account login and password change level
+        Public BattleNetName As String = ""                 '
+        Public BattleNetChannel As String = ""              '
+        Public BattleNetIP As Long = 0                      '
 
-        Public DatabaseAccountID As String = ""     '
-        Public DatabaseAccountPass As String = ""   '
-        Public DatabaseFlags As Long = 0            '
-        Public AccountUniqueID As UInt32 = 0        'Users ID on botnet.
+        Public DatabaseAccountID As String = ""             '
+        Public DatabaseAccountPass As String = ""           '
+        Public DatabaseFlags As Long = 0                    '
+        Public AccountUniqueID As UInt32 = 0                'Users ID on botnet.
+        Public ChatDropOptions As CHAT_DROP_OPTIONS_STRUCT  '
         'Public ChatDrop As Integer     'To far ahead of myself < will be in the state flag >
         'Public Flags As Long = 0       'I must have originally intended this as AccountFlag
 
@@ -418,20 +429,20 @@ Public Module ClientData
             'PACKET_ACCOUNT = 12         '(0x0d)
             'PACKET_CHATDROPOPTIONS = 13 '(0x10)
 
-            PacketHandlers(OPCODES.PACKET_IDLE) = CType(AddressOf OnUnhandledPacket, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_LOGON) = CType(AddressOf CMSG_PACKET_LOGON, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_STATSUPDATE) = CType(AddressOf CMSG_PACKET_STATSUPDATE, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_DATABASE) = CType(AddressOf OnUnhandledPacket, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_MESSAGE) = CType(AddressOf CMSG_PACKET_MESSAGE, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_CYCLE) = CType(AddressOf OnUnhandledPacket, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_USERINFO) = CType(AddressOf CMSG_PACKET_USERINFO, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_BROADCASTMESSAGE) = CType(AddressOf OnUnhandledPacket, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_COMMAND) = CType(AddressOf CMSG_PACKET_COMMAND, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_CHANGEDBPASSWORD) = CType(AddressOf OnUnhandledPacket, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_BOTNETVERSION) = CType(AddressOf CMSG_PACKET_BOTNETVERSION, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_ACCOUNT) = CType(AddressOf CMSG_PACKET_ACCOUNT, HandlePacket)
-            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf OnUnhandledPacket, HandlePacket)
+            PacketHandlers(OPCODES.PACKET_IDLE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                      '       [FULL SUPPORT] -This packet should not be responded to anyways. (could do a cheaky packet length test though...)
+            PacketHandlers(OPCODES.PACKET_LOGON) = CType(AddressOf CMSG_PACKET_LOGON, HandlePacket)                     '   [Working] -TODO: Check for all violations
+            PacketHandlers(OPCODES.PACKET_STATSUPDATE) = CType(AddressOf CMSG_PACKET_STATSUPDATE, HandlePacket)         '   [Working] -TODO: Check Violations, Check Strings, packet length, etc etc.
+            PacketHandlers(OPCODES.PACKET_DATABASE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                  '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_MESSAGE) = CType(AddressOf CMSG_PACKET_MESSAGE, HandlePacket)                 '   [S->C 0x04] -TODO: Rework code, Violation checks
+            PacketHandlers(OPCODES.PACKET_CYCLE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                     '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_USERINFO) = CType(AddressOf CMSG_PACKET_USERINFO, HandlePacket)               '   [Working] -TODO: violations, packet length etc.
+            PacketHandlers(OPCODES.PACKET_BROADCASTMESSAGE) = CType(AddressOf OnUnhandledPacket, HandlePacket)          '[Not implemented] -> S->C 0x04
+            PacketHandlers(OPCODES.PACKET_COMMAND) = CType(AddressOf CMSG_PACKET_COMMAND, HandlePacket)                 '   [S->C 0x04] -TODO: Rework code, Violation checks
+            PacketHandlers(OPCODES.PACKET_CHANGEDBPASSWORD) = CType(AddressOf OnUnhandledPacket, HandlePacket)          '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_BOTNETVERSION) = CType(AddressOf CMSG_PACKET_BOTNETVERSION, HandlePacket)     '   [Working]
+            PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)           '   [SUPPORTED  <2011 predates DB5-100]
+            PacketHandlers(OPCODES.PACKET_ACCOUNT) = CType(AddressOf CMSG_PACKET_ACCOUNT, HandlePacket)                 '       [FULL SUPPORT 4-6-2018]
+            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)              '[You can only set the switches currently][Not implemented within the chat procedures]
         End Sub
         Public Sub OnUnhandledPacket(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("LogType.WARNING, [" & Client.IP.ToString & ":" & Client.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
@@ -646,6 +657,34 @@ Public Module ClientData
             SMSG_PACKET_BOTNETSUBVERSION(Client)
         End Sub
 
+        Public Sub SMSG_CHAT_DROP(ByRef Client As ClientClass)
+            'Send back their current option values.
+            Dim response As New PacketClass(OPCODES.PACKET_CHATDROPOPTIONS)
+            response.GetInt8(0) 'Botnet only had command 0
+            response.GetInt8(ChatDropOptions.BroadCastedChat)
+            response.GetInt8(ChatDropOptions.DatabaseChat)
+            response.GetInt8(ChatDropOptions.WhisperChat)
+            response.GetInt8(ChatDropOptions.OtherDatabaseChat)
+            Client.Send(response)
+        End Sub
+        Public Sub CMSG_CHAT_DROP(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            If packet.Length <= 5 Or (Not (packet.Length = 9)) Then
+                SMSG_CHAT_DROP(Client)
+                Return
+            End If
+            'Set their chosen chat drop options
+            Dim bIntCommand As UInteger = packet.GetInt8()
+            Select Case bIntCommand
+                Case 0 '(0 is the only command botnet has for this feature)
+                    ChatDropOptions.BroadCastedChat = packet.GetInt8()
+                    ChatDropOptions.DatabaseChat = packet.GetInt8()
+                    ChatDropOptions.WhisperChat = packet.GetInt8()
+                    ChatDropOptions.OtherDatabaseChat = packet.GetInt8()
+                    Exit Select
+            End Select
+            SMSG_CHAT_DROP(Client)
+        End Sub
+
         Public Sub CMSG_PACKET_BOTNETCHAT(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("CMSG_PACKET_BOTNETCHAT" & vbNewLine)
             '	(DWORD) command
@@ -709,6 +748,7 @@ Public Module ClientData
                     Return 'exit the loop
                 End If
             Next
+            'TODO: UPDATE ABOVE CODE LOOP NOT NEEDED.
         End Sub
         Private Sub CHAT_MESSAGE_ALL_ON_DATABASE(ByRef Client As ClientClass, ByVal command As Long, ByVal action As Long, ByVal message As String)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
@@ -853,58 +893,61 @@ Public Module ClientData
                         SEND_PACKET_STATSUPDATE(Client, 1) '1 = sucess.
                     End If
 
-                    Client.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
+                    'Double login?
+                    If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                        Client.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
+                    End If
 
                     'Dim start_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
                     'Client.Send(start_of_userlisting) 'Why the voided packet at the start fuck sake.
 
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
-                            'do nothing do not send to the user logging in
-                        Else
+                            If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
+                                'do nothing do not send to the user logging in
+                            Else
 #Region "Botnet Notes"
-                            'notify everyone else user logged on
-                            '	(DWORD) bot id
-                            '	(4.1) (DWORD) database access flags
-                            '		1 = read
-                            '		2 = write
-                            '		4 = restricted access
-                            '	(4.1) (DWORD) administrative capabilities
-                            '		Specified in Zerobot Traditional Flags Format (ZTFF):
-                            '		A = superuser, can perform any administrative action
-                            '		B = broadcast, may use talk-to-all
-                            '		C = connection, may administer botnet connectivity
-                            '		D = database, may create and maintain databases
-                            '		I = ID control, may create and modify hub IDs
-                            '		S = botnet service
-                            '	(4.1) (Admin only) (DWORD) IP address of the bot being described
-                            '           Sent only to users with flags (A or L)
-                            '	(STRING:20) bot name
-                            '	(STRING:*) bot channel
-                            '	(DWORD) bot server
-                            '	(2) (STRING:16) unique account name
-                            '	(3) (STRING:*) database
+                                'notify everyone else user logged on
+                                '	(DWORD) bot id
+                                '	(4.1) (DWORD) database access flags
+                                '		1 = read
+                                '		2 = write
+                                '		4 = restricted access
+                                '	(4.1) (DWORD) administrative capabilities
+                                '		Specified in Zerobot Traditional Flags Format (ZTFF):
+                                '		A = superuser, can perform any administrative action
+                                '		B = broadcast, may use talk-to-all
+                                '		C = connection, may administer botnet connectivity
+                                '		D = database, may create and maintain databases
+                                '		I = ID control, may create and modify hub IDs
+                                '		S = botnet service
+                                '	(4.1) (Admin only) (DWORD) IP address of the bot being described
+                                '           Sent only to users with flags (A or L)
+                                '	(STRING:20) bot name
+                                '	(STRING:*) bot channel
+                                '	(DWORD) bot server
+                                '	(2) (STRING:16) unique account name
+                                '	(3) (STRING:*) database
 #End Region
-                            SEND_PACKET_USERINFO(cliTemp.Value, Client)
-                        End If
-                    Next
-                    'log client in, send client user details of those that are on the server.
-                    'Client.LoggedIn = True
-                    'SEND_PACKET_USERINFO(Client, Client) 'the above loop should do this now
-
-                    For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                            If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
-                                SEND_PACKET_USERINFO(Client, cliTemp2.Value)
+                                SEND_PACKET_USERINFO(cliTemp.Value, Client)
                             End If
-                        End If
-                    Next
-                    'Question here, is this sent everytime this list is requested or just on the inital server join.
-                    Dim end_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
-                    Client.Send(end_of_userlisting)
-                Else
-                    '
-                End If
+                        Next
+                        'log client in, send client user details of those that are on the server.
+                        'Client.LoggedIn = True
+                        'SEND_PACKET_USERINFO(Client, Client) 'the above loop should do this now
+
+                        For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                            If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                                If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
+                                    SEND_PACKET_USERINFO(Client, cliTemp2.Value)
+                                End If
+                            End If
+                        Next
+                        'Question here, is this sent everytime this list is requested or just on the inital server join.
+                        Dim end_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
+                        Client.Send(end_of_userlisting)
+                    Else
+                        '
+                    End If
             Else
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_USERINFO, PROTOCOL_VIOLATION_COMMAND_6.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -947,6 +990,8 @@ Public Module ClientData
             Next
             Return 0 '0 = no account found using this name
         End Function
+
+#Region "---- 0x0D PACKET_ACCOUNT (account management) [done] ----"
         Private Sub VoidUserAccount(ByVal atIndex As UInt32)
             Dim tClient As ClientClass = CLIENTs.Item(atIndex)
             tClient.Account = ""
@@ -960,7 +1005,6 @@ Public Module ClientData
                 Next
             End If
         End Sub
-
         Public Sub SMSG_PACKET_ACCOUNTLI(ByRef client As ClientClass, ByVal res As UInt32, ByVal AccountName As String)
             Debug.Print("SMSG_PACKET_ACCOUNTLI" & vbNewLine)
             'Update users flag.
@@ -1183,6 +1227,7 @@ Public Module ClientData
             End Select
             PROTOCOL_VIOLATION(Client, OPCODES.PACKET_ACCOUNT, PROTOCOL_VIOLATION_COMMAND_13.BAD_PACKET, packet.Length, (packet.Length - packet.Offset))
         End Sub
+#End Region
 
         Private Sub SEND_PACKET_STATSUPDATE(ByRef ThisClient As ClientClass, ByVal iResponse As UInt32)
             Debug.Print("SEND_PACKET_STATSUPDATE" & vbNewLine)
@@ -1301,11 +1346,6 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            'If packet.ProtocalVersion < BOTNET_PROTO_VERSION Then
-            '    Dim VerResponse As New PacketClass(OPCODES.PACKET_BOTNETVERSION)
-            '    VerResponse.AddInt32(BOTNET_PROTO_VERSION)
-            '    Client.Send(VerResponse)
-            'End If
 
             Client.HUB_ID = packet.GetString
             If Client.HUB_ID.Length > MAXLENGTH_HUB_ID Then
