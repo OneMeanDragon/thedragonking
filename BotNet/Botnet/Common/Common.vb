@@ -49,7 +49,7 @@ Public Module Common
         sr = Nothing
         Return outBuf
     End Function
-    Public Function GetAccountFlags(ByVal strPath As String) As Long
+    Public Function GetAccountFlags(ByVal strPath As String) As UInt32
         Dim sr As StreamReader = New StreamReader(strPath & "\" & FileAccounts)
         Dim outBuf As String = sr.ReadToEnd()
         sr.Close()

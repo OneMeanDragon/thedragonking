@@ -100,7 +100,7 @@ Public Module Functions
         Y = &H1000000
         Z = &H2000000
     End Enum
-    Public Function GetFlagCharectersFromFlag(ByVal inflags As Long) As String
+    Public Function GetFlagCharectersFromFlag(ByVal inflags As UInt32) As String
         Dim tmpOut As String = ""
         If (inflags And FLAGS.A) = FLAGS.A Then tmpOut += "A"
         If (inflags And FLAGS.B) = FLAGS.B Then tmpOut += "B"
@@ -131,9 +131,9 @@ Public Module Functions
         'if flag = "" then need to figure out a default flag for a user
         Return tmpOut
     End Function
-    Public Function GetFlagFromString(ByVal inflags As String) As Long
-        Dim CurrentFlag As Long = 0
-        Dim i As Int32 = 0
+    Public Function GetFlagFromString(ByVal inflags As String) As UInt32
+        Dim CurrentFlag As UInt32 = 0
+        Dim i As UInt32 = 0
         For i = 0 To (inflags.Length - 1)
             Select Case (inflags.ToUpper)(i)
                 Case "A"
@@ -218,8 +218,8 @@ Public Module Functions
         Next
         Return CurrentFlag
     End Function
-    Public Function AddFlagsToUser(ByVal CurrentFlag As Long, ByVal sstrFlagsToAdd As String) As Long
-        Dim i As Integer, flagsOut As Long = 0
+    Public Function AddFlagsToUser(ByVal CurrentFlag As UInt32, ByVal sstrFlagsToAdd As String) As UInt32
+        Dim i As UInt32, flagsOut As UInt32 = 0
         For i = 0 To (sstrFlagsToAdd.Length - 1)
             Select Case (sstrFlagsToAdd.ToUpper)(i)
                 Case "A"
@@ -304,8 +304,8 @@ Public Module Functions
         Next
         Return (CurrentFlag + flagsOut)
     End Function
-    Public Function RemoveFlagsFromUser(ByVal CurrentFlag As Long, ByVal sstrFlagsToAdd As String) As Long
-        Dim i As Integer, flagsOut As Long
+    Public Function RemoveFlagsFromUser(ByVal CurrentFlag As UInt32, ByVal sstrFlagsToAdd As String) As UInt32
+        Dim i As UInt32, flagsOut As UInt32
         For i = 0 To (sstrFlagsToAdd.Length - 1)
             Select Case (sstrFlagsToAdd.ToUpper)(i)
                 Case "A"

@@ -105,7 +105,7 @@ Public Module ClientData
         Public IP As Net.IPAddress                  '<-| IP and PORT |
         Public Port As UInteger                     '<-|_____________|
         Public Account As String = ""                       'TODO: Build Struct to store the minimal needed data, Move it to the client class itself.
-        Public AccountFlag As Long = 0                      '
+        Public AccountFlag As UInt32 = 0                      '
         Public HUB_ID As String = ""                        '<-- Same as account pass note
         Public HUB_PASSWORD As String = ""                  '<-- Same as account pass note
         'Public HUB_FLAG As Int32 = 0                       'Again see note for Flags.... 'Unless I had other intentions with this leaving it here commented out just incase I remember.
@@ -113,15 +113,15 @@ Public Module ClientData
         Public Password As String = ""                      '<-- This dosent need to be stored in class, as its only checked at account login and password change level
         Public BattleNetName As String = ""                 '
         Public BattleNetChannel As String = ""              '
-        Public BattleNetIP As Long = 0                      '
+        Public BattleNetIP As UInt32 = 0                      '
 
         Public DatabaseAccountID As String = ""             '
         Public DatabaseAccountPass As String = ""           '
-        Public DatabaseFlags As Long = 0                    '
+        Public DatabaseFlags As UInt32 = 0                    '
         Public AccountUniqueID As UInt32 = 0                'Users ID on botnet.
         Public ChatDropOptions As CHAT_DROP_OPTIONS_STRUCT  '
         'Public ChatDrop As Integer     'To far ahead of myself < will be in the state flag >
-        'Public Flags As Long = 0       'I must have originally intended this as AccountFlag
+        'Public Flags As UInt32 = 0       'I must have originally intended this as AccountFlag
 
         '########### Client State ############
         Public STATE As UInt32 = 0          '#  'Required in Login process. for ease of removing bool mess.
@@ -179,7 +179,14 @@ Public Module ClientData
             Return 0 'Since we cant unsigned a -1 and we wont ever have a client at ID = 0
         End Function
 
+        Private Sub InitLocVars()
+            'set default chatdrops
+            Me.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
 
+        End Sub
         Public Sub OnConnect(ByVal state As Object)
             Me.IP = CType(Socket.RemoteEndPoint, IPEndPoint).Address
             Me.Port = CType(Socket.RemoteEndPoint, IPEndPoint).Port
@@ -188,6 +195,8 @@ Public Module ClientData
 
             Me.Index = Interlocked.Increment(CLIETNIDs)
             Me.AccountUniqueID = Me.Index 'Testing
+
+            Me.InitLocVars()
 
             Me.Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
 
@@ -429,7 +438,7 @@ Public Module ClientData
             'PACKET_ACCOUNT = 12         '(0x0d)
             'PACKET_CHATDROPOPTIONS = 13 '(0x10)
 
-            PacketHandlers(OPCODES.PACKET_IDLE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                      '       [FULL SUPPORT] -This packet should not be responded to anyways. (could do a cheaky packet length test though...)
+            PacketHandlers(OPCODES.PACKET_IDLE) = CType(AddressOf CMSG_NULL, HandlePacket)                              '       [FULL SUPPORT] -This packet should not be responded to anyways. (could do a cheaky packet length test though...)
             PacketHandlers(OPCODES.PACKET_LOGON) = CType(AddressOf CMSG_PACKET_LOGON, HandlePacket)                     '   [Working] -TODO: Check for all violations
             PacketHandlers(OPCODES.PACKET_STATSUPDATE) = CType(AddressOf CMSG_PACKET_STATSUPDATE, HandlePacket)         '   [Working] -TODO: Check Violations, Check Strings, packet length, etc etc.
             PacketHandlers(OPCODES.PACKET_DATABASE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                  '[Not implemented]
@@ -442,10 +451,17 @@ Public Module ClientData
             PacketHandlers(OPCODES.PACKET_BOTNETVERSION) = CType(AddressOf CMSG_PACKET_BOTNETVERSION, HandlePacket)     '   [Working]
             PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)           '   [SUPPORTED  <2011 predates DB5-100]
             PacketHandlers(OPCODES.PACKET_ACCOUNT) = CType(AddressOf CMSG_PACKET_ACCOUNT, HandlePacket)                 '       [FULL SUPPORT 4-6-2018]
-            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)              '[You can only set the switches currently][Not implemented within the chat procedures]
+            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)              '[Done] -> READY TO BE IMPLEMENTED
         End Sub
         Public Sub OnUnhandledPacket(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("LogType.WARNING, [" & Client.IP.ToString & ":" & Client.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
+        End Sub
+        Public Sub CMSG_NULL(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            If (packet.Length < 4) Or (packet.Length > 4) Then
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_IDLE, 0, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            'Else we do not respond to this packet
         End Sub
 #Region "Response Enumerators"
         Private Enum STATS_UPDATE
@@ -594,7 +610,7 @@ Public Module ClientData
         'Error codes:
         '	1 = unrecognized command ID.  Any other code is command specific
 
-        Private Sub PROTOCOL_VIOLATION(ByRef Client As ClientClass, ByVal ErrorFrom As OPCODES, ByVal ErrorID As Integer, ByVal pLength As Long, ByVal pRemainingLen As Long)
+        Private Sub PROTOCOL_VIOLATION(ByRef Client As ClientClass, ByVal ErrorFrom As OPCODES, ByVal ErrorID As Integer, ByVal pLength As UInt32, ByVal pRemainingLen As UInt32)
             Debug.Print("PROTOCOL_VIOLATION" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_PROTOCOL_VIOLATION)
             response.AddInt32(ErrorID)
@@ -660,11 +676,11 @@ Public Module ClientData
         Public Sub SMSG_CHAT_DROP(ByRef Client As ClientClass)
             'Send back their current option values.
             Dim response As New PacketClass(OPCODES.PACKET_CHATDROPOPTIONS)
-            response.GetInt8(0) 'Botnet only had command 0
-            response.GetInt8(ChatDropOptions.BroadCastedChat)
-            response.GetInt8(ChatDropOptions.DatabaseChat)
-            response.GetInt8(ChatDropOptions.WhisperChat)
-            response.GetInt8(ChatDropOptions.OtherDatabaseChat)
+            response.AddInt8(0) 'Botnet only had command 0
+            response.AddInt8(ChatDropOptions.BroadCastedChat)
+            response.AddInt8(ChatDropOptions.DatabaseChat)
+            response.AddInt8(ChatDropOptions.WhisperChat)
+            response.AddInt8(ChatDropOptions.OtherDatabaseChat)
             Client.Send(response)
         End Sub
         Public Sub CMSG_CHAT_DROP(ByRef packet As PacketClass, ByRef Client As ClientClass)
@@ -677,9 +693,33 @@ Public Module ClientData
             Select Case bIntCommand
                 Case 0 '(0 is the only command botnet has for this feature)
                     ChatDropOptions.BroadCastedChat = packet.GetInt8()
+                    If (ChatDropOptions.BroadCastedChat < 0) Then
+                        ChatDropOptions.BroadCastedChat = 0
+                    End If
+                    If ChatDropOptions.BroadCastedChat > 2 Then
+                        ChatDropOptions.BroadCastedChat = 2
+                    End If
                     ChatDropOptions.DatabaseChat = packet.GetInt8()
+                    If (ChatDropOptions.DatabaseChat < 0) Then
+                        ChatDropOptions.DatabaseChat = 0
+                    End If
+                    If ChatDropOptions.DatabaseChat > 2 Then
+                        ChatDropOptions.DatabaseChat = 2
+                    End If
                     ChatDropOptions.WhisperChat = packet.GetInt8()
+                    If (ChatDropOptions.WhisperChat < 0) Then
+                        ChatDropOptions.WhisperChat = 0
+                    End If
+                    If ChatDropOptions.WhisperChat > 2 Then
+                        ChatDropOptions.WhisperChat = 2
+                    End If
                     ChatDropOptions.OtherDatabaseChat = packet.GetInt8()
+                    If (ChatDropOptions.OtherDatabaseChat < 0) Then
+                        ChatDropOptions.OtherDatabaseChat = 0
+                    End If
+                    If ChatDropOptions.OtherDatabaseChat > 2 Then
+                        ChatDropOptions.OtherDatabaseChat = 2
+                    End If
                     Exit Select
             End Select
             SMSG_CHAT_DROP(Client)
@@ -694,22 +734,22 @@ Public Module ClientData
             '	(DWORD) action	: 0x00=talk, 0x01=emote, any other is dropped
             '	(DWORD) id	: for command 0x02, id of bot to send to, otherwise ignored.
             '	(STRING:496) message: blank messages are dropped
-            Dim command As Long = packet.GetInt32
+            Dim command As UInt32 = packet.GetInt32
             If (command < 0) Or (command > 2) Then
                 'bad command
                 Return
             End If
-            Dim action As Long = packet.GetInt32
+            Dim action As UInt32 = packet.GetInt32
             If (action < 0) Or (action > 1) Then
                 'bad action
                 Return
             End If
-            Dim userid As Long = packet.GetInt32
-            Dim message As String = packet.GetString
-            If Trim(message) = "" Then
-                'bad message
-                Return
-            End If
+            Dim userid As UInt32 = packet.GetInt32
+            Dim message() As Byte = packet.GetByteString()
+            'If Trim(message) = "" Then
+            '    'bad message
+            '    Return
+            'End If
             Select Case command
                 Case PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS
                     CHAT_MESSAGE_TO_ALL_USERS(Client, command, action, message)
@@ -720,7 +760,7 @@ Public Module ClientData
             End Select
         End Sub
 
-        Private Sub CHAT_MESSAGE_TO_ALL_USERS(ByRef Client As ClientClass, ByVal command As Long, ByVal action As Long, ByVal message As String)
+        Private Sub CHAT_MESSAGE_TO_ALL_USERS(ByRef Client As ClientClass, ByVal command As UInt32, ByVal action As UInt32, ByVal message() As Byte)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                     If Not (cliTemp.Value.Account = Client.Account) Then
@@ -728,13 +768,13 @@ Public Module ClientData
                         sendmessage.AddInt32(command)
                         sendmessage.AddInt32(action)
                         sendmessage.AddInt32(Client.AccountUniqueID)
-                        sendmessage.AddString(message)
+                        sendmessage.AddByteString(message, message.Length)
                         cliTemp.Value.Send(sendmessage)
                     End If
                 End If
             Next
         End Sub
-        Private Sub CHAT_MESSAGE_TO_USER(ByRef Client As ClientClass, ByVal command As Long, ByVal action As Long, ByVal userid As Long, ByVal message As String)
+        Private Sub CHAT_MESSAGE_TO_USER(ByRef Client As ClientClass, ByVal command As UInt32, ByVal action As UInt32, ByVal userid As UInt32, ByVal message() As Byte)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If cliTemp.Value.AccountUniqueID = userid Then
                     If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
@@ -742,7 +782,7 @@ Public Module ClientData
                         sendmessage.AddInt32(command)
                         sendmessage.AddInt32(action)
                         sendmessage.AddInt32(Client.AccountUniqueID)
-                        sendmessage.AddString(message)
+                        sendmessage.AddByteString(message, message.Length)
                         cliTemp.Value.Send(sendmessage)
                     End If
                     Return 'exit the loop
@@ -750,7 +790,7 @@ Public Module ClientData
             Next
             'TODO: UPDATE ABOVE CODE LOOP NOT NEEDED.
         End Sub
-        Private Sub CHAT_MESSAGE_ALL_ON_DATABASE(ByRef Client As ClientClass, ByVal command As Long, ByVal action As Long, ByVal message As String)
+        Private Sub CHAT_MESSAGE_ALL_ON_DATABASE(ByRef Client As ClientClass, ByVal command As UInt32, ByVal action As UInt32, ByVal message() As Byte)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
                 If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then
                     If Not (cliTemp.Value.Account = Client.Account) Then
@@ -759,7 +799,7 @@ Public Module ClientData
                             sendmessage.AddInt32(command)
                             sendmessage.AddInt32(action)
                             sendmessage.AddInt32(Client.AccountUniqueID)
-                            sendmessage.AddString(message)
+                            sendmessage.AddByteString(message, message.Length)
                             cliTemp.Value.Send(sendmessage)
                         End If
                     End If
@@ -804,7 +844,7 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            Dim target As Long = packet.GetInt32
+            Dim target As UInt32 = packet.GetInt32
             If target <= 0 Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
                 Return

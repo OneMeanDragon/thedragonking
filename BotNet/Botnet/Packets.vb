@@ -33,7 +33,7 @@ Public Module Packets
         Implements IDisposable
 
         Public Data(8196) As Byte
-        Public Offset As Integer = 4
+        Public Offset As UInt32 = 4
 
         Public ReadOnly Property Length() As Integer
             Get
@@ -93,7 +93,7 @@ Public Module Packets
             Data(Data.Length - 2) = CType((buffer And 255), Byte)
             Data(Data.Length - 1) = CType(((buffer >> 8) And 255), Byte)
         End Sub
-        Public Sub AddInt32(ByVal buffer As Integer)
+        Public Sub AddInt32(ByVal buffer As UInt32)
             ReDim Preserve Data(Data.Length + 3)
             Data(2) = (Data.Length) Mod 256
             Data(3) = (Data.Length) \ 256
@@ -108,7 +108,7 @@ Public Module Packets
             Data(Data.Length - 2) = CType(((buffer >> 16) And 255), Byte)
             Data(Data.Length - 1) = CType(((buffer >> 24) And 255), Byte)
         End Sub
-        Public Sub AddInt64(ByVal buffer As Long)
+        Public Sub AddInt64(ByVal buffer As UInt64) 'If i ever get to use this function it'll also overflow
             ReDim Preserve Data(Data.Length + 7)
             Data(2) = (Data.Length) Mod 256
             Data(3) = (Data.Length) \ 256
@@ -134,6 +134,19 @@ Public Module Packets
                 Data(Data.Length - 1 - Bytes.Length + i) = Bytes(i)
             Next i
 
+            Data(Data.Length - 1) = 0
+        End Sub
+        Public Sub AddByteString(ByVal bytStr() As Byte, ByVal iLength As Int32)
+            Dim original_length As UInt32 = Data.Length
+            ReDim Preserve Data(original_length + iLength)
+            Data(2) = (Data.Length) Mod 256
+            Data(3) = (Data.Length) \ 256
+
+            Dim i As Int32 = 0
+            While (i < iLength)
+                Data(original_length + i) = (bytStr(i) And &HFF)
+                i += 1
+            End While
             Data(Data.Length - 1) = 0
         End Sub
         Public Sub AddDouble(ByVal buffer2 As Double)
@@ -162,41 +175,41 @@ Public Module Packets
         End Sub
 
 
-        Public Function GetInt8() As Byte
+        Public Function GetInt8() As UInt16
             Offset = Offset + 1
             Return Data(Offset - 1)
         End Function
-        Public Function GetInt8(ByVal Offset As Integer) As Byte
+        Public Function GetInt8(ByVal Offset As Integer) As UInt16
             Offset = Offset + 1
             Return Data(Offset - 1)
         End Function
-        Public Function GetInt16() As Short
-            Dim num1 As Short = BitConverter.ToInt16(Data, Offset)
+        Public Function GetInt16() As UInt16
+            Dim num1 As UInt16 = BitConverter.ToUInt16(Data, Offset)
             Offset = (Offset + 2)
             Return num1
         End Function
-        Public Function GetInt16(ByVal Offset As Integer) As Short
-            Dim num1 As Short = BitConverter.ToInt16(Data, Offset)
+        Public Function GetInt16(ByVal Offset As Integer) As UInt16
+            Dim num1 As UInt16 = BitConverter.ToUInt16(Data, Offset)
             Offset = (Offset + 2)
             Return num1
         End Function
-        Public Function GetInt32() As Integer
-            Dim num1 As Integer = BitConverter.ToInt32(Data, Offset)
+        Public Function GetInt32() As UInt32
+            Dim num1 As UInt32 = BitConverter.ToUInt32(Data, Offset)
             Offset = (Offset + 4)
             Return num1
         End Function
-        Public Function GetInt32(ByVal Offset As Integer) As Integer
-            Dim num1 As Integer = BitConverter.ToInt32(Data, Offset)
+        Public Function GetInt32(ByVal Offset As Integer) As UInt32
+            Dim num1 As UInt32 = BitConverter.ToUInt32(Data, Offset)
             Offset = (Offset + 4)
             Return num1
         End Function
-        Public Function GetInt64() As Long
-            Dim num1 As Long = BitConverter.ToInt64(Data, Offset)
+        Public Function GetInt64() As UInt64
+            Dim num1 As UInt64 = BitConverter.ToUInt64(Data, Offset)
             Offset = (Offset + 8)
             Return num1
         End Function
-        Public Function GetInt64(ByVal Offset As Integer) As Long
-            Dim num1 As Long = BitConverter.ToInt64(Data, Offset)
+        Public Function GetInt64(ByVal Offset As Integer) As UInt64
+            Dim num1 As UInt64 = BitConverter.ToUInt64(Data, Offset)
             Offset = (Offset + 8)
             Return num1
         End Function
@@ -231,8 +244,26 @@ Public Module Packets
             End While
             Offset = Offset + 1
 
-            Return System.Text.Encoding.ASCII.GetString(Data, start, i)
+            'Dim tmpstr As String = System.Text.UTF8Encoding.UTF8.GetString(Data, start, i)
+            Return System.Text.Encoding.ASCII.GetString(Data, start, i) 'Ascii is good enough for filenames etc but not fo (msg from user -> user)
         End Function
+
+        Public Function GetByteString() As Byte()
+            Dim bytOut() As Byte
+            Dim i As UInt32
+            Dim start As UInt32 = Offset
+
+            While (Not (Data(start + i) = 0))
+                ReDim Preserve bytOut(i)
+                bytOut(i) = Data(start + i)
+                i += 1
+                Offset += 1
+            End While
+            ReDim Preserve bytOut(i)
+            bytOut(i) = 0
+            Return bytOut
+        End Function
+
         Public Function GetString(ByVal Offset As Integer) As String
             Dim i As Integer = Offset
             Dim tmpString As String = ""
