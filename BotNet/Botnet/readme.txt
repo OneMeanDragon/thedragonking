@@ -21,7 +21,7 @@ String HUB_ID
 String HUB_PASSWORD
 
 S>C 0x01: feild
-UInt32 response
+UInt32 HUB_LOGIN_RESPONSE (BOOL)
 UInt32 client_ipv4_address
 
 ----------------------------------------------------------------------------------
@@ -57,9 +57,56 @@ String DatabaseInfo_space_DatabasePassword
 UInt32 IsCycleing_BOOL
 
 S->C 0x02: feild
-UInt32 responce_BOOL
+UInt32 STATUS_UPDATE_RESPONSE (BOOL)
 UInt32 Account_Flag (only seen if your account flag changes, if this DWORD is not present your prev flag hasent changed values)
 
 ----------------------------------------------------------------------------------
+#define MSG_ACCOUNT 0xD
+
+enum PROTOCOL_VIOLATION_MSG_ACCOUNT {
+    MISSING_SUBCOMMAND = 1
+    BAD_SUBCOMMAND = 2
+    MISSING_USERNAME = 3
+    EMPTY_USERNAME = 4
+    MISSING_PASSWORD = 5
+    EMPTY_PASSWORD = 6
+    SC1_MISSING_NEWPASSWORD = 7
+    SC1_EMPTY_NEWPASSWORD = 8
+    ACCOUNT_CREATION_FAIL = 9
+    ACCOUNT_CREATION_ACCOUNT_EXISTS = 10
+    USERNAME_BAD_LENGTH = 11
+    PASSWORD_BAD_LENGTH = 12
+    PACKET_BAD_LENGTH = 13
+    BAD_PACKET = 14
+    ACCOUNT_CHANGEPASSWORD_ACCOUNTNONEXISTANT = 15
+    ACCOUNT_CHANGEPASSWORD_BADPASSWORD = 16
+    ACCOUNT_CHANGEPASSWORD_REQUIRESSERVERADMINHELP = 17
+}
+
+enum MSG_ACCOUNT_RESPONSE {
+    Accepted = 1
+    Failed = 0
+}
+
+C->S 0xD: feild
+UInt32 Command
+String accountname
+if(command == 0) { //Login
+    string accountpassword
+}
+if (command == 1) { //Change password
+    string oldpassword
+    string newpassword
+}
+if (command == 2) { //Account create
+    string accountpassword
+}
+
+S-> 0xD: feild
+UInt32 Command
+UInt32 MSG_ACCOUNT_RESPONSE (BOOL)
+
+----------------------------------------------------------------------------------
+
 
 Adding bit by bit as I go over the current code.
