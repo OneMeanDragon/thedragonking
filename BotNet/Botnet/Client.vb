@@ -449,9 +449,9 @@ Public Module ClientData
             PacketHandlers(OPCODES.PACKET_COMMAND) = CType(AddressOf CMSG_PACKET_COMMAND, HandlePacket)                 '   [S->C 0x04] -TODO: Rework code, Violation checks
             PacketHandlers(OPCODES.PACKET_CHANGEDBPASSWORD) = CType(AddressOf OnUnhandledPacket, HandlePacket)          '[Not implemented]
             PacketHandlers(OPCODES.PACKET_BOTNETVERSION) = CType(AddressOf CMSG_PACKET_BOTNETVERSION, HandlePacket)     '   [Working]
-            PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)           '   [SUPPORTED  <2011 predates DB5-100]
+            PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)           '       [FULL SUPPORT 4-8-2018]
             PacketHandlers(OPCODES.PACKET_ACCOUNT) = CType(AddressOf CMSG_PACKET_ACCOUNT, HandlePacket)                 '       [FULL SUPPORT 4-6-2018]
-            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)              '[Done] -> READY TO BE IMPLEMENTED
+            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)              '       [FULL SUPPORT 4-8-2018]
         End Sub
         Public Sub OnUnhandledPacket(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("LogType.WARNING, [" & Client.IP.ToString & ":" & Client.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
@@ -738,9 +738,52 @@ Public Module ClientData
             '	(DWORD) action	: 0x00=talk, 0x01=emote, any other is dropped
             '	(DWORD) id	: for command 0x02, id of bot to send to, otherwise ignored.
             '	(STRING:496) message: blank messages are dropped
-            Dim command As UInt32 = packet.GetInt32
+
+            'Check client state.
+            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                '2 = bad state, client must be visible
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 2, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            'check packet size (min: 17 max: 512)
+            If packet.Length < 17 Or packet.Length > 512 Then '
+                If packet.Length = 16 Then
+                    'missing text
+                    PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 6, packet.Length, (packet.Length - packet.Offset))
+                    Return
+                End If
+                If packet.Length > 12 And packet.Length < 15 Then
+                    'missing id
+                    PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 5, packet.Length, (packet.Length - packet.Offset))
+                    Return
+                End If
+                If packet.Length > 8 And packet.Length < 11 Then
+                    'missing action
+                    PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 4, packet.Length, (packet.Length - packet.Offset))
+                    Return
+                End If
+                If packet.Length > 4 And packet.Length < 8 Then
+                    'missing command
+                    PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 3, packet.Length, (packet.Length - packet.Offset))
+                    Return
+                End If
+                Return
+            End If
+            '    command 11
+            '2 = bad state, client must be visible  [done]
+            '3 = missing distribution level         [done]
+            '4 = missing emote                      [done]
+            '5 = missing target id                  [done]
+            '6 = missing text                       [done]
+            '
+            '7 = bad distribution level
+            '8 = bad target (only if attempting to whisper a user)
+            '                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 7, packet.Length, (packet.Length - packet.Offset))
+
+            Dim command As PACKET_COMMAND_COMMANDS = packet.GetInt32
             If (command < 0) Or (command > 2) Then
-                'bad command
+                '7 = bad distribution level
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 7, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
             Dim action As UInt32 = packet.GetInt32
@@ -750,16 +793,21 @@ Public Module ClientData
             End If
             Dim userid As UInt32 = packet.GetInt32
             Dim message() As Byte = packet.GetByteString()
-            'If Trim(message) = "" Then
-            '    'bad message
-            '    Return
-            'End If
+            If message.Length = 1 Then 'we are not sending out blank messages (length 1 = null message)
+                Return
+            End If
+
             Select Case command
                 Case PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS
                     CHAT_MESSAGE_TO_ALL_USERS(Client, command, action, message)
                 Case PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE
                     CHAT_MESSAGE_ALL_ON_DATABASE(Client, command, action, message)
                 Case PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT
+                    If Not CLIENTs.ContainsKey(userid) Then
+                        '8 = bad target (only if attempting to whisper a user)
+                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 8, packet.Length, (packet.Length - packet.Offset))
+                        Return 'The user in question does not exist, stop wasting time here.
+                    End If
                     CHAT_MESSAGE_TO_USER(Client, command, action, userid, message)
             End Select
         End Sub
