@@ -486,6 +486,10 @@ Public Module ClientData
             SEND_TO_DATABASE = 1
             DIRECTED_TO_SPECIFIC_CLIENT = 2
         End Enum
+        Private Enum PACKET_COMMAND_ACTIONS
+            TALK = 0
+            EMOTE = 1
+        End Enum
 #Region "VIOLATION ERROR CODES"
         Private Enum PROTOCOL_VIOLATION_COMMAND_1
             CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME = 2
@@ -677,10 +681,10 @@ Public Module ClientData
             'Send back their current option values.
             Dim response As New PacketClass(OPCODES.PACKET_CHATDROPOPTIONS)
             response.AddInt8(0) 'Botnet only had command 0
-            response.AddInt8(ChatDropOptions.BroadCastedChat)
-            response.AddInt8(ChatDropOptions.DatabaseChat)
-            response.AddInt8(ChatDropOptions.WhisperChat)
-            response.AddInt8(ChatDropOptions.OtherDatabaseChat)
+            response.AddInt8(Client.ChatDropOptions.BroadCastedChat)
+            response.AddInt8(Client.ChatDropOptions.DatabaseChat)
+            response.AddInt8(Client.ChatDropOptions.WhisperChat)
+            response.AddInt8(Client.ChatDropOptions.OtherDatabaseChat)
             Client.Send(response)
         End Sub
         Public Sub CMSG_CHAT_DROP(ByRef packet As PacketClass, ByRef Client As ClientClass)
@@ -692,33 +696,33 @@ Public Module ClientData
             Dim bIntCommand As UInteger = packet.GetInt8()
             Select Case bIntCommand
                 Case 0 '(0 is the only command botnet has for this feature)
-                    ChatDropOptions.BroadCastedChat = packet.GetInt8()
-                    If (ChatDropOptions.BroadCastedChat < 0) Then
-                        ChatDropOptions.BroadCastedChat = 0
+                    Client.ChatDropOptions.BroadCastedChat = packet.GetInt8()
+                    If (Client.ChatDropOptions.BroadCastedChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If ChatDropOptions.BroadCastedChat > 2 Then
-                        ChatDropOptions.BroadCastedChat = 2
+                    If Client.ChatDropOptions.BroadCastedChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
-                    ChatDropOptions.DatabaseChat = packet.GetInt8()
-                    If (ChatDropOptions.DatabaseChat < 0) Then
-                        ChatDropOptions.DatabaseChat = 0
+                    Client.ChatDropOptions.DatabaseChat = packet.GetInt8()
+                    If (Client.ChatDropOptions.DatabaseChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If ChatDropOptions.DatabaseChat > 2 Then
-                        ChatDropOptions.DatabaseChat = 2
+                    If Client.ChatDropOptions.DatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
-                    ChatDropOptions.WhisperChat = packet.GetInt8()
-                    If (ChatDropOptions.WhisperChat < 0) Then
-                        ChatDropOptions.WhisperChat = 0
+                    Client.ChatDropOptions.WhisperChat = packet.GetInt8()
+                    If (Client.ChatDropOptions.WhisperChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If ChatDropOptions.WhisperChat > 2 Then
-                        ChatDropOptions.WhisperChat = 2
+                    If Client.ChatDropOptions.WhisperChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
-                    ChatDropOptions.OtherDatabaseChat = packet.GetInt8()
-                    If (ChatDropOptions.OtherDatabaseChat < 0) Then
-                        ChatDropOptions.OtherDatabaseChat = 0
+                    Client.ChatDropOptions.OtherDatabaseChat = packet.GetInt8()
+                    If (Client.ChatDropOptions.OtherDatabaseChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If ChatDropOptions.OtherDatabaseChat > 2 Then
-                        ChatDropOptions.OtherDatabaseChat = 2
+                    If Client.ChatDropOptions.OtherDatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
                     Exit Select
             End Select
@@ -760,52 +764,123 @@ Public Module ClientData
             End Select
         End Sub
 
-        Private Sub CHAT_MESSAGE_TO_ALL_USERS(ByRef Client As ClientClass, ByVal command As UInt32, ByVal action As UInt32, ByVal message() As Byte)
+        Private Sub CHAT_MESSAGE_TO_ALL_USERS(ByRef Client As ClientClass, ByVal command As PACKET_COMMAND_COMMANDS, ByVal action As PACKET_COMMAND_ACTIONS, ByVal message() As Byte)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                    If Not (cliTemp.Value.Account = Client.Account) Then
-                        Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
-                        sendmessage.AddInt32(command)
-                        sendmessage.AddInt32(action)
-                        sendmessage.AddInt32(Client.AccountUniqueID)
-                        sendmessage.AddByteString(message, message.Length)
-                        cliTemp.Value.Send(sendmessage)
-                    End If
+                If Not (cliTemp.Value.Account = Client.Account) Then '
+                    'Enable ChatDrop Fire this message through CHAT_MESSAGE_TO_USER pump since it has all the checking finnished.
+                    CHAT_MESSAGE_TO_USER(Client, command, action, cliTemp.Value.AccountUniqueID, message)
                 End If
             Next
         End Sub
-        Private Sub CHAT_MESSAGE_TO_USER(ByRef Client As ClientClass, ByVal command As UInt32, ByVal action As UInt32, ByVal userid As UInt32, ByVal message() As Byte)
+        'THERE CAN BE ONLY 1 (dont need this function it does the database checks in the actual send message now)
+        Private Sub CHAT_MESSAGE_ALL_ON_DATABASE(ByRef Client As ClientClass, ByVal command As PACKET_COMMAND_COMMANDS, ByVal action As PACKET_COMMAND_ACTIONS, ByVal message() As Byte)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.AccountUniqueID = userid Then
-                    If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                        Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
-                        sendmessage.AddInt32(command)
-                        sendmessage.AddInt32(action)
-                        sendmessage.AddInt32(Client.AccountUniqueID)
-                        sendmessage.AddByteString(message, message.Length)
-                        cliTemp.Value.Send(sendmessage)
-                    End If
-                    Return 'exit the loop
+                If Not (cliTemp.Value.Account = Client.Account) Then
+                    'Enable ChatDrop Fire this message through CHAT_MESSAGE_TO_USER pump since it has all the checking finnished.
+                    CHAT_MESSAGE_TO_USER(Client, command, action, cliTemp.Value.AccountUniqueID, message)
                 End If
             Next
-            'TODO: UPDATE ABOVE CODE LOOP NOT NEEDED.
         End Sub
-        Private Sub CHAT_MESSAGE_ALL_ON_DATABASE(ByRef Client As ClientClass, ByVal command As UInt32, ByVal action As UInt32, ByVal message() As Byte)
-            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then
-                    If Not (cliTemp.Value.Account = Client.Account) Then
-                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                            Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
-                            sendmessage.AddInt32(command)
-                            sendmessage.AddInt32(action)
-                            sendmessage.AddInt32(Client.AccountUniqueID)
-                            sendmessage.AddByteString(message, message.Length)
-                            cliTemp.Value.Send(sendmessage)
+        Private Sub CHAT_MESSAGE_TO_USER(ByRef Client As ClientClass, ByVal command As PACKET_COMMAND_COMMANDS, ByVal action As PACKET_COMMAND_ACTIONS, ByVal userid As UInt32, ByVal message() As Byte)
+            'Is the sender logged in yet.
+            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                Return 'This right here should be a PROTOCOL_VIOLATION
+            End If
+            'Does the user in question exist
+            If Not CLIENTs.ContainsKey(userid) Then
+                Return 'The user in question does not exist, stop wasting time here.
+            End If
+            'is the user in question logged in
+            If Not ((CLIENTs(userid).STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                Return 'this user is not online yet
+            End If
+
+
+
+#Region "---- CHAT DROP OPTION CHECKS ----"
+            'BROADCAST
+            Select Case command
+#Region "Broadcasted to all"
+                Case PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS
+                    'are we blocking database messages
+                    If CLIENTs(userid).ChatDropOptions.BroadCastedChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                        If CLIENTs(userid).ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                            Return
+                        End If
+                        'are we blocking <no account>s
+                        If CLIENTs(userid).ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                            If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                                Return
+                            End If
                         End If
                     End If
+                    Exit Select
+#End Region
+#Region "To User (whispers)"
+                Case PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT
+                    If CLIENTs(userid).ChatDropOptions.WhisperChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                        If CLIENTs(userid).ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                            Return
+                        End If
+                        'are we blocking <no account>s
+                        If CLIENTs(userid).ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                            If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                                Return
+                            End If
+                        End If
+                    End If
+                    Exit Select
+#End Region
+#Region "To Database"
+                Case PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE
+                    'Is this user the same database
+                    If Not (Client.DatabaseAccountID.ToLower = CLIENTs(userid).DatabaseAccountID.ToLower) Then
+                        Return
+                    End If
+                    'chatdrop.
+                    If CLIENTs(userid).ChatDropOptions.DatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                        If CLIENTs(userid).ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                            Return
+                        End If
+                        'are we blocking <no account>s
+                        If CLIENTs(userid).ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                            If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                                Return
+                            End If
+                        End If
+                    End If
+                    Exit Select
+#End Region
+                Case Else 'bad command
+                    Return
+            End Select
+            'is this message from somone on another database.
+            If CLIENTs(userid).ChatDropOptions.OtherDatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                If CLIENTs(userid).ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                    If Not (Client.DatabaseAccountID.ToLower = CLIENTs(userid).DatabaseAccountID.ToLower) Then 'I donot believe i added the bracketed no account name to the server but anyways
+                        Return
+                    End If
                 End If
-            Next
+                If CLIENTs(userid).ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                    If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                        Return
+                    End If
+                End If
+            End If
+#End Region
+
+            '
+            'ALL CHECKS ARE IN THE ABOVE CODE
+            'IF WE GOT HERE FIRE OFF THE MESSAGE
+            '
+            Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
+            sendmessage.AddInt32(command)
+            sendmessage.AddInt32(action)
+            sendmessage.AddInt32(Client.AccountUniqueID)
+            sendmessage.AddByteString(message, message.Length)
+            CLIENTs(userid).Send(sendmessage)
         End Sub
+
         Public Sub CMSG_PACKET_MESSAGE(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("CMSG_PACKET_MESSAGE" & vbNewLine)
             Dim sender As String = packet.GetString
