@@ -11,15 +11,15 @@ Read the Official Doc on whats listed here.
 [Supported at bare minimum]
 0x02	PACKET_STATSUPDATE <cycleing needs more info>
 0x0A	PACKET_BOTNETVERSION <(DWORD) client capabilities>
+0x04	PACKET_MESSAGE <malformed sender not imp>
+0x07	PACKET_BROADCASTMESSAGE	<malformed sender not imp>
+0x08	PACKET_COMMAND <malformed sender not imp>
 
 [Working But not checked for violations]
-0x04	PACKET_MESSAGE
-0x08	PACKET_COMMAND
-	
+
 [Not implemented as of yet]
 0x03	PACKET_DATABASE
 0x05	PACKET_CYCLE
-0x07	PACKET_BROADCASTMESSAGE
 0x09	PACKET_CHANGEDBPASSWORD
 ----------------------------------------------------------------------------------
 
