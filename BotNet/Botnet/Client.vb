@@ -438,21 +438,98 @@ Public Module ClientData
             'PACKET_ACCOUNT = 12         '(0x0d)
             'PACKET_CHATDROPOPTIONS = 13 '(0x10)
 
-            PacketHandlers(OPCODES.PACKET_IDLE) = CType(AddressOf CMSG_NULL, HandlePacket)                              '       [FULL SUPPORT]          [bp: y]
-            PacketHandlers(OPCODES.PACKET_LOGON) = CType(AddressOf CMSG_PACKET_LOGON, HandlePacket)                     '       [FULL SUPPORT 4-8-2018] [bp: y]
-            PacketHandlers(OPCODES.PACKET_STATSUPDATE) = CType(AddressOf CMSG_PACKET_STATSUPDATE, HandlePacket)         '       [MIN SUPPORT 4-8-2018]  [bp: y]         <cycleing needs more info>
-            PacketHandlers(OPCODES.PACKET_DATABASE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                  '[Not implemented]
-            PacketHandlers(OPCODES.PACKET_MESSAGE) = CType(AddressOf CMSG_PACKET_MESSAGE, HandlePacket)                 '   [S->C 0x04] -TODO: Rework code, Violation checks
-            PacketHandlers(OPCODES.PACKET_CYCLE) = CType(AddressOf OnUnhandledPacket, HandlePacket)                     '[Not implemented]
-            PacketHandlers(OPCODES.PACKET_USERINFO) = CType(AddressOf CMSG_PACKET_USERINFO, HandlePacket)               '       [FULL SUPPORT 4-8-2018] [bp: y]
-            PacketHandlers(OPCODES.PACKET_BROADCASTMESSAGE) = CType(AddressOf OnUnhandledPacket, HandlePacket)          '[Not implemented] -> S->C 0x04
-            PacketHandlers(OPCODES.PACKET_COMMAND) = CType(AddressOf CMSG_PACKET_COMMAND, HandlePacket)                 '   [S->C 0x04] -TODO: Rework code, Violation checks
-            PacketHandlers(OPCODES.PACKET_CHANGEDBPASSWORD) = CType(AddressOf OnUnhandledPacket, HandlePacket)          '[Not implemented]
-            PacketHandlers(OPCODES.PACKET_BOTNETVERSION) = CType(AddressOf CMSG_PACKET_BOTNETVERSION, HandlePacket)     '       [MIN SUPPORT 4-8-2018]  [bp: y]         (still uncertain how the [(DWORD) client capabilities] is used)
-            PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)           '       [FULL SUPPORT 4-8-2018] [bp: y]
-            PacketHandlers(OPCODES.PACKET_ACCOUNT) = CType(AddressOf CMSG_PACKET_ACCOUNT, HandlePacket)                 '       [FULL SUPPORT 4-6-2018] [bp: y]
-            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)              '       [FULL SUPPORT 4-8-2018] [bp: y]         <unless it extended to the command processor aswell> Updated: If a bad packet is sent it will now drop your connection.
+            PacketHandlers(OPCODES.PACKET_IDLE) = CType(AddressOf CMSG_NULL, HandlePacket)                                  '       [FULL SUPPORT]          [bp: y]
+            PacketHandlers(OPCODES.PACKET_LOGON) = CType(AddressOf CMSG_PACKET_LOGON, HandlePacket)                         '       [FULL SUPPORT 4-8-2018] [bp: y]
+            PacketHandlers(OPCODES.PACKET_STATSUPDATE) = CType(AddressOf CMSG_PACKET_STATSUPDATE, HandlePacket)             '       [MIN SUPPORT 4-8-2018]  [bp: y] <cycleing not imp> <cycleing considered defunct anyhow>
+            PacketHandlers(OPCODES.PACKET_DATABASE) = CType(AddressOf CMSG_PACKET_DATABASE, HandlePacket)                   '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_MESSAGE) = CType(AddressOf CMSG_PACKET_MESSAGE, HandlePacket)                     '       [MIN SUPPORT 4-11-2018] [bp: y] <malformed sender check not imp>
+            PacketHandlers(OPCODES.PACKET_CYCLE) = CType(AddressOf CMSG_PACKET_CYCLE, HandlePacket)                         '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_USERINFO) = CType(AddressOf CMSG_PACKET_USERINFO, HandlePacket)                   '       [FULL SUPPORT 4-8-2018] [bp: y]
+            PacketHandlers(OPCODES.PACKET_BROADCASTMESSAGE) = CType(AddressOf CMSG_PACKET_BROADCASTMESSAGE, HandlePacket)   '       [MIN SUPPORT 4-11-2018] [bp: y] <malformed sender check not imp>
+            PacketHandlers(OPCODES.PACKET_COMMAND) = CType(AddressOf CMSG_PACKET_COMMAND, HandlePacket)                     '       [MIN SUPPORT 4-11-2018] [bp: y] <malformed sender check not imp>
+            PacketHandlers(OPCODES.PACKET_CHANGEDBPASSWORD) = CType(AddressOf CMSG_PACKET_CHANGEDBPASSWORD, HandlePacket)   '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_BOTNETVERSION) = CType(AddressOf CMSG_PACKET_BOTNETVERSION, HandlePacket)         '       [MIN SUPPORT 4-8-2018]  [bp: y] <client capabilitys dword not imp>
+            PacketHandlers(OPCODES.PACKET_BOTNETCHAT) = CType(AddressOf CMSG_PACKET_BOTNETCHAT, HandlePacket)               '       [FULL SUPPORT 4-8-2018] [bp: y]
+            PacketHandlers(OPCODES.PACKET_ADMIN) = CType(AddressOf CMSG_BOTNET_ADMIN, HandlePacket)                         '[Not implemented]
+            PacketHandlers(OPCODES.PACKET_ACCOUNT) = CType(AddressOf CMSG_PACKET_ACCOUNT, HandlePacket)                     '       [FULL SUPPORT 4-6-2018] [bp: y]
+            PacketHandlers(OPCODES.PACKET_CHATDROPOPTIONS) = CType(AddressOf CMSG_CHAT_DROP, HandlePacket)                  '       [FULL SUPPORT 4-8-2018] [bp: y] <unless it extended to the command processor aswell>
         End Sub
+        'BotData.BotNet.DataBaseName = .GetString("Database", "MiniCounsel")
+        'BotData.BotNet.DataBasePassword = .GetString("Password", "65db65ca4e8d7f5a")
+        Public Sub CMSG_BOTNET_ADMIN(ByRef packet As PacketClass, ByRef Client As ClientClass)
+
+        End Sub
+        Public Sub CMSG_PACKET_CHANGEDBPASSWORD(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            '(UINT32) Password selection
+            '   0x00: Read-only
+            '   0x01: Full
+            '   0x02: Restricted
+            '(STRING) New password 
+        End Sub
+        Public Sub CMSG_PACKET_DATABASE(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            '(UINT32) Subcommand
+            '
+            'For subcommand 0x01 (Transfer status):   [rev: 4]
+            '    (UINT32) Transfer event
+            'For subcommand 0x02 (Entry modified)
+            '    (UINT32) Sending Bot ID              [rev 4; awl: 1]
+            '    (UINT32) Last modification time      [rev: 4; awl: 1]
+            '    (STRING) Usermask
+            '    (STRING) Flags
+            '    (STRING) Comment                     [rev: 4; awl: 1]
+            'For subcommand 0x03 (Entry removed):
+            '   (UINT32) Sending Bot ID              [rev 4; awl: 1]
+            '   (UINT32) Last modification time      [rev: 4; awl: 1]
+            '   (STRING) Usermask
+            '   (STRING) Comment                     [rev: 4; awl: 1]        
+        End Sub
+        Public Sub CMSG_PACKET_CYCLE(ByRef packet As PacketClass, ByRef Client As ClientClass) '[DEFUNCT] 
+            '(UINT32)   Count
+            '(STRING)[] Usernames           
+            '
+            'Send cycle request (defunct).
+            'With the changes Battle.net made To operators In Private channels, this message Is considered defunct.
+            'The Usernames String array should contain the number Of entries specified In Count, specifying the usernames of bots to cycle.
+
+            If (packet.Length < 9) Or (packet.Length > 512) Then 'Bad packet (min: 9, max: 512) [512 as i remember is the maximum sized packet that can be sent]
+                Call Client.Delete()
+                Return
+            End If
+            Return 'They can send it but does nothing.
+
+            Dim NumberOfNames As UInt32 = packet.GetInt32()
+            'We can test the packet size once more before going through the listing
+            If Not (packet.Length >= (NumberOfNames + 8)) Then 'if the lengths are = then the names are all empty strings.
+                'NumberOfNames = at the minimum how many nulls are in this feild and 8 is the head + count dwords.
+                Call Client.Delete()
+                Return
+            End If
+
+            Dim dwOffset As UInt32 = 8
+            Dim Names(NumberOfNames) As String
+            Dim i As UInt32 = 0
+            For i = 0 To NumberOfNames
+                If Not (dwOffset < packet.Length) Then
+                    'If its not less than, then its equal or greater meaning we are going to go passed the end of the packet
+                    Call Client.Delete()
+                    Return
+                End If
+                Names(i) = packet.GetString()
+                dwOffset += Names(i).Length + 1
+                'Should check if Names(i) = ""
+                'Should check if Names(i).length > bnutName.MaxLength
+            Next
+            'Final packet check
+            If Not (packet.Length = (dwOffset + 8)) Then
+                'Both values should match else bad packet
+                Call Client.Delete()
+                Return
+            End If
+
+            'Now that we got the names do something.
+
+        End Sub
+
         Public Sub OnUnhandledPacket(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("LogType.WARNING, [" & Client.IP.ToString & ":" & Client.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
         End Sub
@@ -1287,6 +1364,254 @@ Public Module ClientData
         End Sub
 #End Region
 
+#Region " ---- Commands 0x04 Messages [done] ---- "
+        Public Sub CMSG_PACKET_BROADCASTMESSAGE(ByRef packet As PacketClass, ByRef Client As ClientClass) 'Command to all bots.
+            '		2 = bad state, client tried to issue command while invisible    [done]
+            '       3 = missing sender string                                       [done]
+            '       4 = missing command                                             [done]
+            '       5 = empty sender                                                [done]
+            '       6 = empty command                                               [done]
+            '       7 = malformed sender name                                       [    ] <- what?
+            '                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
+
+            '(STRING) Sender name    [max: 32]   (min: 6, max: 420)
+            '(STRING) Command        [max: 384]
+            '
+            If (packet.Length < 5) Then
+                'missing sender + command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.MISSING_SENDER_SRTING, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            If (packet.Length < 6) Or (packet.Length > 420) Then 'Bad packet (min: 6, max: 420)
+                Call Client.Delete()
+                Return
+            End If
+            If (Not ((Client.AccountFlag And FLAGS.B) = FLAGS.B)) And (Not ((Client.AccountFlag And FLAGS.A) = FLAGS.A)) Then
+                'client must have flag "B" or "A"
+                Call Client.Delete()
+                Return
+            End If
+            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                '2 = bad state, client tried to issue command while invisible 
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+
+            'Dont need to encode these strip from the packet and fire off
+            Dim SenderName() As Byte = packet.GetByteString()
+            If (SenderName.Length = 1) Then
+                'empty sender
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.EMPTY_SENDER, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            If (packet.Length = (SenderName.Length + 4)) Then
+                'missing command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.MISSING_COMMAND, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            Dim command() As Byte = packet.GetByteString()
+            If (command.Length = 1) Then
+                'empty sender
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            'The message goes to every client.
+            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                    SMSG_PACKET_COMMANDOVERBOTNET(Client.AccountUniqueID, PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS, SenderName, command, cliTemp.Value)
+                End If
+            Next
+        End Sub
+        Public Sub CMSG_PACKET_COMMAND(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_COMMAND" & vbNewLine)
+
+            '(send to server) id 0x08: command to specific botnet bot
+            'Contents:
+            '	(DWORD) target bot id       (min: 10, max: 424)
+            '	(STRING:32) sending user
+            '	(STRING:384) command
+            'Response:   the server forwards the message to the specified bot in the
+            '    Form of a msg 0x4, providing that
+            '1) The target Is online
+            '2) The sender has permission to forward commands.  Permission here
+            '    refers to both relaying And write access, as referenced in command
+            '    id 0x4.
+            '3) The target Is on the same database as the sending user
+
+            'PROTOCOL ERRORS
+            '2 = bad state, client must be visible  [done]
+            '3 = no target ID                       [done]
+            '4 = no sender string                   [done]
+            '5 = no command string                  [done]
+            '6 = bad target ID                      [done]
+            '7 = empty sender                       [done]
+            '8 = empty command                      [done]
+            '9 = malformed sender name              [    ] what?
+            '   PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
+
+            If (packet.Length < 8) Then
+                'missing target
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.NO_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            If (packet.Length < 9) Then
+                'missing sender
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.NO_SENDER_STRING, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            If (packet.Length < 10) Or (packet.Length > 424) Then 'Bad packet (min: 10, max: 424)
+                Call Client.Delete()
+                Return
+            End If
+            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                '2 = bad state, client tried to issue command while invisible 
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            Dim target_bot_id As UInt32 = packet.GetInt32()
+            'does this target exist on the server right now?
+            If Not CLIENTs.ContainsKey(target_bot_id) Then
+                'target does not exist
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            Dim sender() As Byte = packet.GetByteString()
+            If sender.Length = 1 Then
+                'empty sender
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_SENDER, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            'do we have a command message
+            If packet.Length = (8 + sender.Length) Then 'bytestring includes the null
+                'missing command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.NO_COMMAND_STRING, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            Dim command() As Byte = packet.GetByteString()
+            If command.Length = 1 Then
+                'empty command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            SMSG_PACKET_COMMANDOVERBOTNET(Client.AccountUniqueID, PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT, sender, command, CLIENTs(target_bot_id))
+        End Sub
+        Public Sub CMSG_PACKET_MESSAGE(ByRef packet As PacketClass, ByRef Client As ClientClass)
+            Debug.Print("CMSG_PACKET_MESSAGE" & vbNewLine)
+            '(send to server) id 0x04 command to bots on same database
+            '
+            'Contents:
+            '	(STRING32) sending user
+            '	(STRING:384) command
+            'Response:   all CLIENTs on the same database as the sending client receive
+            '    packet id 0x04.  If the sending client does Not have permission
+            '   to relay commands to other clients, only the sending client
+            '   receives command id 0x04 from the server.  The sending client
+            '   must have write access To the database, Or have restricted
+            '   access And the command match a pre-defined list of acceptable
+            '   restricted user commands.  If the client does Not meet the access
+            '   requirement, no response Is generated to any user (including the sender
+            '   itself).
+            '
+            '
+            'SEE PROTOCOL ERRORS FROM 0x07 [done] including the what?
+
+            If (packet.Length < 5) Then
+                'missing sender + command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_MESSAGE, PROTOCOL_VIOLATION_COMMAND_7.MISSING_SENDER_SRTING, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            If (packet.Length < 6) Or (packet.Length > 420) Then 'Bad packet (min: 6, max: 420)
+                Call Client.Delete()
+                Return
+            End If
+            If (Not ((Client.DatabaseFlags And FLAGS.B) = FLAGS.B)) And (Not ((Client.DatabaseFlags And FLAGS.C) = FLAGS.C)) Then
+                'client must have flag "B" or "A"
+                'Call Client.Delete()
+                Return
+            End If
+            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                '2 = bad state, client tried to issue command while invisible 
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_MESSAGE, PROTOCOL_VIOLATION_COMMAND_7.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            'Dont need to encode these strip from the packet and fire off
+            Dim SenderName() As Byte = packet.GetByteString()
+            If (SenderName.Length = 1) Then
+                'empty sender
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.EMPTY_SENDER, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+            If (packet.Length = (SenderName.Length + 4)) Then
+                'missing command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.MISSING_COMMAND, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            Dim command() As Byte = packet.GetByteString()
+            If (command.Length = 1) Then
+                'empty command
+                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
+                Return
+            End If
+
+            'The message goes to every client on this database.
+            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+                If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                    If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then 'Must be on the same database
+                        SMSG_PACKET_COMMANDOVERBOTNET(Client.AccountUniqueID, PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE, SenderName, command, cliTemp.Value)
+                    End If
+                End If
+            Next
+
+            '            Dim sender As String = packet.GetString
+            '            Dim command As String = packet.GetString
+            '            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
+            '               If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then
+            '                   If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            '                       'do nothing do not send to the user logging in
+            '                       '(send to client) id 0x04: command over botnet
+            '                       'Contents:
+            '                       '	(4.1) (DWORD) sending client's ID
+            '                       '	(4.1) (DWORD) distribution status
+            '                       '		0 = broadcast to all users
+            '                       '		1 = sent to database
+            '                       '		2 = directed to this client specifically
+            '                       '	(STRING) sender
+            '                       '	(STRING) command
+            '                       'Response: None.
+            '                       Dim sendcommand As New PacketClass(OPCODES.PACKET_MESSAGE)
+            '                       If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+            '                           sendcommand.AddInt32(Client.AccountUniqueID)                    '4.1
+            '                           sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE)  '4.1
+            '                       End If
+            '                       sendcommand.AddString(Client.Account) 'There was a reason sender string is in the packet... lol
+            '                       sendcommand.AddString(command)
+            '                       cliTemp.Value.Send(sendcommand)
+            '                   Else
+            '                       'Cant send to this user they're not logged in
+            '                   End If
+            '               End If
+            '            Next
+        End Sub
+        Private Sub SMSG_PACKET_COMMANDOVERBOTNET(ByVal sender_id As UInt32, ByVal distro_status As PACKET_COMMAND_COMMANDS, ByVal sender() As Byte, ByVal command() As Byte, ByRef Client As ClientClass)
+            Dim response As New PacketClass(OPCODES.PACKET_MESSAGE)
+            If Client.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
+                response.AddInt32(sender_id)        '4.1
+                response.AddInt32(distro_status)    '4.1
+            End If
+            response.AddByteString(sender, sender.Length)
+            response.AddByteString(command, command.Length)
+            Client.Send(response)
+        End Sub
+#End Region
+
+
         Public Sub SMSG_CHAT_DROP(ByRef Client As ClientClass)
             'Send back their current option values.
             Dim response As New PacketClass(OPCODES.PACKET_CHATDROPOPTIONS)
@@ -1551,105 +1876,6 @@ Public Module ClientData
             CLIENTs(userid).Send(sendmessage)
         End Sub
 #End Region
-
-        Public Sub CMSG_PACKET_MESSAGE(ByRef packet As PacketClass, ByRef Client As ClientClass)
-            Debug.Print("CMSG_PACKET_MESSAGE" & vbNewLine)
-            Dim sender As String = packet.GetString
-            Dim command As String = packet.GetString
-            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then
-                    If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                        'do nothing do not send to the user logging in
-                        '(send to client) id 0x04: command over botnet
-                        'Contents:
-                        '	(4.1) (DWORD) sending client's ID
-                        '	(4.1) (DWORD) distribution status
-                        '		0 = broadcast to all users
-                        '		1 = sent to database
-                        '		2 = directed to this client specifically
-                        '	(STRING) sender
-                        '	(STRING) command
-                        'Response: None.
-                        Dim sendcommand As New PacketClass(OPCODES.PACKET_MESSAGE)
-                        If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                            sendcommand.AddInt32(Client.AccountUniqueID)                    '4.1
-                            sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE)  '4.1
-                        End If
-                        sendcommand.AddString(Client.Account)
-                        sendcommand.AddString(command)
-                        cliTemp.Value.Send(sendcommand)
-                    Else
-                        'Cant send to this user they're not logged in
-                    End If
-                End If
-            Next
-        End Sub
-        Public Sub CMSG_PACKET_COMMAND(ByRef packet As PacketClass, ByRef Client As ClientClass)
-            Debug.Print("CMSG_PACKET_COMMAND" & vbNewLine)
-            If packet.Data.Length < 10 Then 'header+dword+null+null
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Return
-            End If
-            Dim target As UInt32 = packet.GetInt32
-            If target <= 0 Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
-                Return
-            End If
-            Dim sender As String = packet.GetString
-            If sender.Length > MAXLENGTH_SENDER Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.MALFORMED_SENDER_NAME, packet.Length, (packet.Length - packet.Offset))
-                Return
-            ElseIf sender = "" Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_SENDER, packet.Length, (packet.Length - packet.Offset))
-                Return
-            End If
-            Dim command As String = packet.GetString
-            If command.Length > MAXLENGTH_COMMAND Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Return
-            ElseIf command = "" Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
-                Return
-            End If
-            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                Return
-            End If
-            Dim tarFound As Boolean = False
-            For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.AccountUniqueID = target Then
-                    tarFound = True
-                    If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                        'do nothing do not send to the user logging in
-                        '(send to client) id 0x04: command over botnet
-                        'Contents:
-                        '	(4.1) (DWORD) sending client's ID
-                        '	(4.1) (DWORD) distribution status
-                        '		0 = broadcast to all users
-                        '		1 = sent to database
-                        '		2 = directed to this client specifically
-                        '	(STRING) sender
-                        '	(STRING) command
-                        'Response: None.
-                        Dim sendcommand As New PacketClass(OPCODES.PACKET_MESSAGE)
-                        If cliTemp.Value.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                            sendcommand.AddInt32(Client.AccountUniqueID)                                '4.1
-                            sendcommand.AddInt32(PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT)   '4.1
-                        End If
-                        sendcommand.AddString(Client.Account)
-                        sendcommand.AddString(command)
-                        cliTemp.Value.Send(sendcommand)
-                    Else
-                        PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
-                        Return
-                    End If
-                End If
-            Next
-            If Not tarFound Then
-                PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_TARGET_ID, packet.Length, (packet.Length - packet.Offset))
-                Return
-            End If
-        End Sub
 
         Private Function IsUserNameOnLine(ByVal AccountName As String) As Boolean
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs

@@ -17,8 +17,10 @@ Public Module Packets
         PACKET_BOTNETVERSION_AK = 9     '(0x09) 'Botnet protocal request reply.
         PACKET_BOTNETVERSION = 10       '(0x0a) 'done
         PACKET_BOTNETCHAT = 11          '(0x0b) 'done
-        PACKET_ACCOUNT = 13             '(0x0C)
-        '                               '(0x0d)
+        PACKET_ADMIN = 12               '(0x0C)
+        PACKET_ACCOUNT = 13             '(0x0d)
+        'PACKET_DATABASE_CHMO = 14      '(0x0e)
+        '                               '(0x0f)
         PACKET_CHATDROPOPTIONS = 16     '(0x10)
     End Enum
     Public Enum sOPCODES
