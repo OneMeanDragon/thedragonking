@@ -41,11 +41,11 @@ Public Module Network
             If m_flagStopListen Then Return
 
             Dim m_Client As New ClientClass()
-            m_Client.Socket = m_Socket.EndAccept(ar)
+            m_Client.SocketData.sckClient = m_Socket.EndAccept(ar)
             'Thread.Sleep(100)
             'MessageBox.Show((m_Client.Socket Is m_Socket).ToString())
-            m_Client.Socket.NoDelay = True
-            m_Client.Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, 1)
+            m_Client.SocketData.sckClient.NoDelay = True
+            m_Client.SocketData.sckClient.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, 1)
 
             m_Socket.BeginAccept(AddressOf AcceptConnection, Nothing)
 

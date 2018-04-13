@@ -37,6 +37,39 @@ Public Structure CHAT_DROP_OPTIONS_STRUCT
     Public OtherDatabaseChat As CHAT_DROP_OPTIONS_SETTINGS
 End Structure
 
+Public Structure HostInfos
+    Public IP As String         '
+    Public HostName As String   '
+End Structure
+Public Structure SocketInfos
+    Public sckClient As Socket  '
+    Public IP As IPAddress      '
+    Public Port As UInteger     '
+    Public Host As HostInfos    '
+End Structure
+
+Public Structure AccountStore
+    Public Name As String
+    '<password not needed> server itself dosent need to ever store this value, since the server checks validity on the fly.
+    Public Flag As UInt32
+End Structure
+Public Structure BattleNStore
+    Public Name As String
+    Public Channel As String
+    Public Server As UInt32
+End Structure
+Public Structure BotNetStorage
+    Public ID As UInt32
+    Public STATE As UInt32
+    Public CLIENT_CAPABILITIES As UInt32
+    Public COMMUNICATION_VERSION As SERVER_VERSION
+    'Public HUB As AccountStore <not needed>
+    Public Account As AccountStore
+    Public Database As AccountStore
+    Public Battlenet As BattleNStore
+    Public ChatDropOptions As CHAT_DROP_OPTIONS_STRUCT
+End Structure
+
 #Region "Client friendly module"
 Public Module cliFunctions
     Friend Function COMS_VER(ByVal requested_version As UInt32) As SERVER_VERSION
@@ -66,66 +99,13 @@ Public Module ClientData
     Public MAXLENGTH_COMMAND As Integer = 384
     Public MAXLENGTH_SENDER As Integer = 32
 
-    Public Structure HostInfos
-        Public IP As String         '
-        Public HostName As String   '
-    End Structure
-    Public Structure SocketInfos
-        Public sckClient As Socket  '
-        Public IP As IPAddress      '
-        Public Port As UInteger     '
-        Public Host As HostInfos    '
-    End Structure
-
-    Public Structure AccountStore
-        Public Name As String
-        '<password not needed> server itself dosent need to ever store this value, since the server checks validity on the fly.
-        Public Flag As UInt32
-    End Structure
-    Public Structure BattleNStore
-        Public Name As String
-        Public Channel As String
-        Public Server As UInt32
-    End Structure
-    Public Structure BotNetStorage
-        Public ID As UInt32
-        Public STATE As UInt32
-        Public CLIENT_CAPABILITIES As UInt32
-        Public COMMUNICATION_VERSION As SERVER_VERSION
-        'Public HUB As AccountStore <not needed>
-        Public Account As AccountStore
-        Public Database As AccountStore
-        Public UserStatus As BattleNStore
-    End Structure
-
     <Serializable()>
     Public Class ClientInfo
         Public Index As UInteger
-        '                                           '   _____________
-        Public IP As Net.IPAddress                  '<-| IP and PORT |
-        Public Port As UInteger                     '<-|_____________|
-        Public Account As String = ""                       'TODO: Build Struct to store the minimal needed data, Move it to the client class itself.
-        Public AccountFlag As UInt32 = 0                      '
-        Public HUB_ID As String = ""                        '<-- Same as account pass note
-        Public HUB_PASSWORD As String = ""                  '<-- Same as account pass note
-        'Public HUB_FLAG As Int32 = 0                       'Again see note for Flags.... 'Unless I had other intentions with this leaving it here commented out just incase I remember.
 
-        Public Password As String = ""                      '<-- This dosent need to be stored in class, as its only checked at account login and password change level
-        Public BattleNetName As String = ""                 '
-        Public BattleNetChannel As String = ""              '
-        Public BattleNetIP As UInt32 = 0                      '
+        Public SocketData As SocketInfos
 
-        Public DatabaseAccountID As String = ""             '
-        Public DatabaseAccountPass As String = ""           '
-        Public DatabaseFlags As UInt32 = 0                    '
-        Public AccountUniqueID As UInt32 = 0                'Users ID on botnet.
-        Public ChatDropOptions As CHAT_DROP_OPTIONS_STRUCT  '
-        'Public ChatDrop As Integer     'To far ahead of myself < will be in the state flag >
-        'Public Flags As UInt32 = 0       'I must have originally intended this as AccountFlag
-
-        '########### Client State ############
-        Public STATE As UInt32 = 0          '#  'Required in Login process. for ease of removing bool mess.
-        '#####################################
+        Public ExtendedInfo As BotNetStorage
 
         Public CLIENT_CAPABILITIES As UInt32 = 0
         Public COMMUNICATION_VERSION As SERVER_VERSION = SERVER_VERSION.DEFAULT_RV
@@ -135,8 +115,6 @@ Public Module ClientData
         Inherits ClientInfo
         Implements IDisposable
 
-
-        Public Socket As Socket = Nothing
         Public Queue As New Queue
         Private WithEvents KeepAliveTimer As Timers.Timer
 
@@ -149,10 +127,10 @@ Public Module ClientData
         Public Function GetClientInfo() As ClientInfo
             Dim ci As New ClientInfo
 
-            ci.Account = Account
+            ci.ExtendedInfo.Account.Name = ExtendedInfo.Account.Name
             ci.Index = Index
-            ci.IP = IP
-            ci.Port = Port
+            ci.SocketData.IP = SocketData.IP
+            ci.SocketData.Port = SocketData.Port
 
             Return ci
         End Function
@@ -162,7 +140,7 @@ Public Module ClientData
             Dim IdMatch As Boolean = False
             While IsUnique = False
                 For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                    If cliTemp.Value.AccountUniqueID = TmpID Then
+                    If cliTemp.Value.ExtendedInfo.ID = TmpID Then
                         IdMatch = True
                         Exit For
                     End If
@@ -181,24 +159,31 @@ Public Module ClientData
 
         Private Sub InitLocVars()
             'set default chatdrops
-            Me.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
-            Me.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
-            Me.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
-            Me.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ExtendedInfo.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ExtendedInfo.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ExtendedInfo.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+            Me.ExtendedInfo.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+
+            'Account
+            Me.ExtendedInfo.Account.Name = ""
+            Me.ExtendedInfo.Database.Name = ""
+            Me.ExtendedInfo.Battlenet.Name = ""
+            Me.ExtendedInfo.Battlenet.Channel = ""
 
         End Sub
+
         Public Sub OnConnect(ByVal state As Object)
-            Me.IP = CType(Socket.RemoteEndPoint, IPEndPoint).Address
-            Me.Port = CType(Socket.RemoteEndPoint, IPEndPoint).Port
+            Me.SocketData.IP = CType(SocketData.sckClient.RemoteEndPoint, IPEndPoint).Address
+            Me.SocketData.Port = CType(SocketData.sckClient.RemoteEndPoint, IPEndPoint).Port
             'Me.AccountUniqueID = GetUniqueID() 'NOTE: We dont need to do this it can be done via Me.Index.
-            Debug.Print("Incomming connection from [" & IP.ToString & ":" & Port & "]")
+            Debug.Print("Incomming connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "]")
 
             Me.Index = Interlocked.Increment(CLIETNIDs)
-            Me.AccountUniqueID = Me.Index 'Testing
+            Me.ExtendedInfo.ID = Me.Index 'Testing
 
             Me.InitLocVars()
 
-            Me.Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
+            Me.SocketData.sckClient.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
 
 
             SyncLock CType(CLIENTs, ICollection).SyncRoot
@@ -211,13 +196,13 @@ Public Module ClientData
         Private SocketLoopData() As Byte
         Private SocketLoopDataLength As Integer
         Public Sub OnData(ByVal ar As IAsyncResult)
-            If Socket Is Nothing Then Return
-            If Not Socket.Connected Then Return
+            If SocketData.sckClient Is Nothing Then Return
+            If Not SocketData.sckClient.Connected Then Return
             If WS.m_flagStopListen Then Return
             Dim PacketLen As Integer
 
             Try
-                SocketBytes = Socket.EndReceive(ar)
+                SocketBytes = SocketData.sckClient.EndReceive(ar)
                 If SocketBytes = 0 Then
                     Me.Dispose()
                 Else
@@ -255,7 +240,7 @@ Public Module ClientData
                         End If
                     End While
 
-                    Socket.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
+                    SocketData.sckClient.BeginReceive(SocketBuffer, 0, SocketBuffer.Length, SocketFlags.None, AddressOf OnData, Nothing)
 
                     ThreadPool.QueueUserWorkItem(AddressOf OnPacket)
                 End If
@@ -264,7 +249,7 @@ Public Module ClientData
                 Select Case sckerr.NativeErrorCode
                     Case 10054 'Connection was closed at remote end point. (Remote Peer)
 #If DEBUG Then
-                        Debug.Print("WARNING, [" & IP.ToString & ":" & Port & "] " & sckerr.Message)
+                        Debug.Print("WARNING, [" & SocketData.IP.ToString & ":" & SocketData.Port & "] " & sckerr.Message)
 #End If
                         Exit Select
                 End Select
@@ -273,7 +258,7 @@ Public Module ClientData
 
             Catch err As Exception
 #If DEBUG Then
-                Debug.Print("WARNING, [" & IP.ToString & ":" & Port & "] cause error " & err.ToString)
+                Debug.Print("WARNING, [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & err.ToString)
 #End If
 
                 Me.Dispose()
@@ -304,47 +289,47 @@ Public Module ClientData
         End Sub
 
         Public Sub Send(ByVal data() As Byte)
-            If Not Socket.Connected Then Exit Sub
+            If Not SocketData.sckClient.Connected Then Exit Sub
 
             Try
-                Socket.BeginSend(data, 0, data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
+                SocketData.sckClient.BeginSend(data, 0, data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
             Catch Err As Exception
-                Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & Err.ToString)
+                Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & Err.ToString)
                 Delete()
             End Try
         End Sub
         Public Sub Send(ByRef packet As PacketClass, ByVal clSocket As Socket)
             If packet Is Nothing Then Throw New ApplicationException("Packet doesn't contain data!")
 
-            If Not Socket.Connected Then Exit Sub
+            If Not SocketData.sckClient.Connected Then Exit Sub
 
             Try
                 Dim data As Byte() = packet.Data
                 clSocket.BeginSend(data, 0, data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
             Catch Err As Exception
-                Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & Err.ToString)
+                Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & Err.ToString)
                 Delete()
             End Try
             packet.Dispose()
         End Sub
         Public Sub Send(ByRef packet As PacketClass)
             If packet Is Nothing Then Throw New ApplicationException("Packet doesn't contain data!")
-            If Socket Is Nothing Then
-                Debug.Print(Me.AccountUniqueID.ToString() & ":" & "bad socket?")
+            If SocketData.sckClient Is Nothing Then
+                Debug.Print(Me.ExtendedInfo.ID.ToString() & ":" & "bad socket?")
             End If
-            If Not Socket.Connected Then
+            If Not SocketData.sckClient.Connected Then
                 Delete() 'remove the client
                 Exit Sub
             End If
 
             Try
-                Socket.BeginSend(packet.Data, 0, packet.Data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
+                SocketData.sckClient.BeginSend(packet.Data, 0, packet.Data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
                 'Dim i As Integer = Socket.Send(packet.Data, 0, packet.Data.Length, SocketFlags.None)
             Catch SE As SocketException
-                Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & SE.ToString)
+                Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & SE.ToString)
                 Delete()
             Catch Err As Exception
-                Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & Err.ToString)
+                Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & Err.ToString)
                 Delete()
             End Try
             packet.Dispose()
@@ -352,56 +337,56 @@ Public Module ClientData
         Public Sub SendMultiplyPackets(ByRef packet As PacketClass)
             If packet Is Nothing Then Throw New ApplicationException("Packet doesn't contain data!")
 
-            If Not Socket.Connected Then Exit Sub
+            If Not SocketData.sckClient.Connected Then Exit Sub
 
             Try
                 Dim data As Byte() = packet.Data.Clone
-                Socket.BeginSend(data, 0, data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
+                SocketData.sckClient.BeginSend(data, 0, data.Length, SocketFlags.None, AddressOf OnSendComplete, Nothing)
             Catch Err As Exception
-                Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & Err.ToString)
+                Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & Err.ToString)
                 Delete()
             End Try
             'Don't forget to clean after using this function
         End Sub
 
         Public Sub OnSendComplete(ByVal ar As IAsyncResult)
-            If Not Socket Is Nothing Then
+            If Not SocketData.sckClient Is Nothing Then
                 Try
-                    Dim bytesSent As Integer = Socket.EndSend(ar)
+                    Dim bytesSent As Integer = SocketData.sckClient.EndSend(ar)
                     Debug.Print("bytes sent: " & bytesSent)
                     Interlocked.Add(DataTransferOut, bytesSent)
                 Catch SE As SocketException
-                    Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & SE.ToString)
+                    Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & SE.ToString)
                     Delete()
                 Catch Err As Exception
-                    Debug.WriteLine("CRITICAL, Connection from [" & IP.ToString & ":" & Port & "] cause error " & Err.ToString)
+                    Debug.WriteLine("CRITICAL, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] cause error " & Err.ToString)
                     Delete()
                 End Try
             End If
         End Sub
 
         Private Sub Dispose() Implements System.IDisposable.Dispose
-            If ((Me.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If ((Me.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                    If cliTemp.Value.AccountUniqueID = AccountUniqueID Then
+                    If cliTemp.Value.ExtendedInfo.ID = ExtendedInfo.ID Then
                         'do nothing do not send to the user logging off
                     Else
                         'notify everyone else user logged off
-                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'only if they are loggedin
+                        If ((cliTemp.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'only if they are loggedin
                             Dim leave As New PacketClass(sOPCODES.PACKET_USERLOGGINGOFF)
-                            leave.AddInt32(AccountUniqueID)
+                            leave.AddInt32(ExtendedInfo.ID)
                             leave.AddInt32(&H7) '0x7??
                             cliTemp.Value.Send(leave)
                         End If
                     End If
                 Next
             End If
-            Debug.Print("NETWORK, Connection from [" & IP.ToString & ":" & Port & "] disposed ")
+            Debug.Print("NETWORK, Connection from [" & SocketData.IP.ToString & ":" & SocketData.Port & "] disposed ")
 
             On Error Resume Next
 
-            If Not Socket Is Nothing Then Socket.Close()
-            Socket = Nothing
+            If Not SocketData.sckClient Is Nothing Then SocketData.sckClient.Close()
+            SocketData.sckClient = Nothing
 
             If Not KeepAliveTimer Is Nothing Then KeepAliveTimer.Enabled = False
             KeepAliveTimer = Nothing
@@ -531,7 +516,7 @@ Public Module ClientData
         End Sub
 
         Public Sub OnUnhandledPacket(ByRef packet As PacketClass, ByRef Client As ClientClass)
-            Debug.Print("LogType.WARNING, [" & Client.IP.ToString & ":" & Client.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
+            Debug.Print("LogType.WARNING, [" & Client.SocketData.IP.ToString & ":" & Client.SocketData.Port.ToString & "] " & CType(packet.OpCode, OPCODES) & " [Unhandled Packet]" & " [Protocol version: " & packet.ProtocalVersion & "]")
         End Sub
 #Region "Response Enumerators"
         Private Enum STATS_UPDATE
@@ -706,20 +691,20 @@ Public Module ClientData
         Private Sub SEND_PACKET_USERINFO(ByRef ToClient As ClientClass, ByVal FromClient As ClientClass)
             Debug.Print("SEND_PACKET_USERINFO" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_USERINFO)
-            response.AddInt32(FromClient.AccountUniqueID)
+            response.AddInt32(FromClient.ExtendedInfo.ID)
             If ToClient.COMMUNICATION_VERSION = SERVER_VERSION.REVISION_1 Then
-                response.AddInt32(FromClient.DatabaseFlags)
-                response.AddInt32(FromClient.AccountFlag) 'Added
-                If ((ToClient.AccountFlag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.AccountFlag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
-                    response.AddByteArray(FromClient.IP.GetAddressBytes())
+                response.AddInt32(FromClient.ExtendedInfo.Database.Flag)
+                response.AddInt32(FromClient.ExtendedInfo.Account.Flag) 'Added
+                If ((ToClient.ExtendedInfo.Account.Flag And Functions.FLAGS.A) = Functions.FLAGS.A) Or ((ToClient.ExtendedInfo.Account.Flag And Functions.FLAGS.L) = Functions.FLAGS.L) Then
+                    response.AddByteArray(FromClient.SocketData.IP.GetAddressBytes())
                     'response.AddByteArray(CType(FromClient.Socket.RemoteEndPoint, IPEndPoint).Address.GetAddressBytes())
                 End If
             End If
-            response.AddString(FromClient.BattleNetName)
-            response.AddString(FromClient.BattleNetChannel)
-            response.AddInt32(FromClient.BattleNetIP)
-            response.AddString(FromClient.Account)
-            response.AddString(FromClient.DatabaseAccountID)
+            response.AddString(FromClient.ExtendedInfo.Battlenet.Name)
+            response.AddString(FromClient.ExtendedInfo.Battlenet.Channel)
+            response.AddInt32(FromClient.ExtendedInfo.Battlenet.Server)
+            response.AddString(FromClient.ExtendedInfo.Account.Name)
+            response.AddString(FromClient.ExtendedInfo.Database.Name)
             ToClient.Send(response)
         End Sub
         Public Sub CMSG_PACKET_USERINFO(ByRef packet As PacketClass, ByRef Client As ClientClass)
@@ -729,23 +714,23 @@ Public Module ClientData
                 Return
             End If
 
-            If ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then
-                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then
+                If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                     'Log them in send everyone else the update
-                    If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Or ((Client.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                    If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Or ((Client.ExtendedInfo.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
                         SEND_PACKET_STATSUPDATE(Client, 1) '1 = sucess.
                     End If
 
                     'Double login?
-                    If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                        Client.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
+                    If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                        Client.ExtendedInfo.STATE += STATE_FLAGS.ACCOUNT_LOGGED_IN 'Update they have logged in finnaly
                     End If
 
                     'Dim start_of_userlisting As New PacketClass(OPCODES.PACKET_USERINFO)
                     'Client.Send(start_of_userlisting) 'Why the voided packet at the start fuck sake.
 
                     For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
+                        If ((cliTemp.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) = False Then
                             'do nothing do not send to the user logging in
                         Else
 #Region "Botnet Notes"
@@ -779,8 +764,8 @@ Public Module ClientData
                     'SEND_PACKET_USERINFO(Client, Client) 'the above loop should do this now
 
                     For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                        If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                            If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
+                        If ((cliTemp2.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                            If Not cliTemp2.Value.ExtendedInfo.ID = Client.ExtendedInfo.ID Then
                                 SEND_PACKET_USERINFO(Client, cliTemp2.Value)
                             End If
                         End If
@@ -871,9 +856,9 @@ Public Module ClientData
             Debug.Print("SEND_PACKET_STATSUPDATE" & vbNewLine)
             Dim response As New PacketClass(OPCODES.PACKET_STATSUPDATE)
             response.AddInt32(iResponse)
-            If ((ThisClient.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
-                ThisClient.STATE -= STATE_FLAGS.FLAG_CHANGED 'send update and remove flag
-                response.AddInt32(ThisClient.AccountFlag) 'Only way this makes sense
+            If ((ThisClient.ExtendedInfo.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                ThisClient.ExtendedInfo.STATE -= STATE_FLAGS.FLAG_CHANGED 'send update and remove flag
+                response.AddInt32(ThisClient.ExtendedInfo.Account.Flag) 'Only way this makes sense
             End If
             ThisClient.Send(response)
         End Sub
@@ -912,7 +897,7 @@ Public Module ClientData
                 Return
             End If
 
-            If Not ((Client.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then
+            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.CLIENT_NOTYET_AUTHORIZED, packet.Length, (packet.Length - packet.Offset))
                 Return
                 'ElseIf Not ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then
@@ -925,22 +910,22 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.LEN_PACKET_TO_SMALL, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            Client.BattleNetName = packet.GetString
-            dwOffsetLoc += Client.BattleNetName.Length + 1
-            If Client.BattleNetName.Length > MAXLENGTH_BATTLENET_NAME Then
+            Client.ExtendedInfo.Battlenet.Name = packet.GetString
+            dwOffsetLoc += Client.ExtendedInfo.Battlenet.Name.Length + 1
+            If Client.ExtendedInfo.Battlenet.Name.Length > MAXLENGTH_BATTLENET_NAME Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.LEN_VIOLATES_BATTLENET_NAME_LENGTH, packet.Length, packet.Offset)
                 Return
-            ElseIf Client.BattleNetName = "" Then
+            ElseIf Client.ExtendedInfo.Battlenet.Name = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BLANK_BATTLENET_NAME_EMPTY, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
 
-            Client.BattleNetChannel = packet.GetString
-            dwOffsetLoc += Client.BattleNetChannel.Length + 1
-            If Client.BattleNetChannel.Length > MAXLENGTH_BATTLENET_CHANNEL Then
+            Client.ExtendedInfo.Battlenet.Channel = packet.GetString
+            dwOffsetLoc += Client.ExtendedInfo.Battlenet.Channel.Length + 1
+            If Client.ExtendedInfo.Battlenet.Channel.Length > MAXLENGTH_BATTLENET_CHANNEL Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.LEN_VIOLATES_CHANNEL_NAME_LENGTH, packet.Length, packet.Offset)
                 Return
-            ElseIf Client.BattleNetChannel = "" Then
+            ElseIf Client.ExtendedInfo.Battlenet.Channel = "" Then
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BLANK_BATTLENET_CHANNELNAME_EMPTY, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
@@ -949,7 +934,7 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.MISSING_SERVER_IP, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            Client.BattleNetIP = packet.GetInt32
+            Client.ExtendedInfo.Battlenet.Server = packet.GetInt32
             dwOffsetLoc += 4
 
             If (Not (packet.Length > dwOffsetLoc)) Then
@@ -967,10 +952,10 @@ Public Module ClientData
             dwOffsetLoc += tmpStr.Length + 1
 
             Dim DatabaseData() As String = tmpStr.Split(" ")
-            Client.DatabaseAccountID = DatabaseData(0)
-            Client.DatabaseAccountPass = tmpStr.Substring(Client.DatabaseAccountID.Length + 1) 'DatabaseData(1) 'System.Text.Encoding.UTF8.GetBytes(tmpStr.Split(" ")(1))
+            Client.ExtendedInfo.Database.Name = DatabaseData(0)
+            Dim DatabaseAccountPass = tmpStr.Substring(Client.ExtendedInfo.Database.Name.Length + 1) 'DatabaseData(1) 'System.Text.Encoding.UTF8.GetBytes(tmpStr.Split(" ")(1))
 
-            If Client.DatabaseAccountID = "" Or Client.DatabaseAccountPass = "" Then
+            If Client.ExtendedInfo.Database.Name = "" Or DatabaseAccountPass = "" Then
                 ' 7 = bad size for database string [Missing strings]
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BAD_DATABASE_SIZE, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -989,29 +974,29 @@ Public Module ClientData
             End If
 
             If IsCycleing > 0 Then
-                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'just incase.....
-                    Client.STATE += STATE_FLAGS.ACCOUNT_CYCLEING
+                If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'just incase.....
+                    Client.ExtendedInfo.STATE += STATE_FLAGS.ACCOUNT_CYCLEING
                 End If
             Else
-                If ((Client.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'just incase.....
-                    Client.STATE -= STATE_FLAGS.ACCOUNT_CYCLEING
+                If ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_CYCLEING) = STATE_FLAGS.ACCOUNT_CYCLEING) Then 'just incase.....
+                    Client.ExtendedInfo.STATE -= STATE_FLAGS.ACCOUNT_CYCLEING
                 End If
             End If
 
             'Check if the database info matches if not then fail.
             Dim iResponse As UInt32 = 0
-            If Client.DatabaseAccountPass = GetDatabasePass(Client.DatabaseAccountID) Then
-                Client.DatabaseFlags = GetDatabaseFlags(Client.DatabaseAccountID, Client.Account)
-                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If DatabaseAccountPass = GetDatabasePass(Client.ExtendedInfo.Database.Name) Then
+                Client.ExtendedInfo.Database.Flag = GetDatabaseFlags(Client.ExtendedInfo.Database.Name, Client.ExtendedInfo.Account.Name)
+                If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                     'This user is not logged in yet send once the userlist requested, so that they get their account flag.
                     'If we got here the user has passed this section set the state and continue.
-                    If ((Client.STATE And STATE_FLAGS.STATUS_INITALIZED) = STATE_FLAGS.STATUS_INITALIZED) Then
+                    If ((Client.ExtendedInfo.STATE And STATE_FLAGS.STATUS_INITALIZED) = STATE_FLAGS.STATUS_INITALIZED) Then
                         'Client has already initalized their request, shouldent get here but just incase we do.
                         PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.BAD_STATE, packet.Length, packet.Offset)
                         Return
                     Else
                         'dont need to test this if we dont get here the client selfdestructs.
-                        Client.STATE += STATE_FLAGS.STATUS_INITALIZED
+                        Client.ExtendedInfo.STATE += STATE_FLAGS.STATUS_INITALIZED
                     End If
                     Return
                 End If
@@ -1021,7 +1006,7 @@ Public Module ClientData
                 '#################################
                 'Failed to login to Database    '#  'removed STATS_UPDATE.Failed response.
                 '#################################
-                If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this is true they are on the userlist already
+                If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this is true they are on the userlist already
                     PROTOCOL_VIOLATION(Client, OPCODES.PACKET_STATSUPDATE, PROTOCOL_VIOLATION_COMMAND_2.DATABASE_INFO_DID_NOT_MATCH, packet.Length, (packet.Offset - 4)) '-4 = go back before the cycling dword
                     Return
                 End If
@@ -1031,8 +1016,8 @@ Public Module ClientData
 
             Debug.Print("CMSG_PACKET_STATSUPDATE" & vbNewLine)
             For Each cliTemp2 As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If ((cliTemp2.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this user is logged in and is cycling
-                    If Not cliTemp2.Value.AccountUniqueID = Client.AccountUniqueID Then
+                If ((cliTemp2.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then 'if this user is logged in and is cycling
+                    If Not cliTemp2.Value.ExtendedInfo.ID = Client.ExtendedInfo.ID Then
                         SEND_PACKET_USERINFO(cliTemp2.Value, Client)
                     End If
                 End If
@@ -1058,34 +1043,34 @@ Public Module ClientData
                 Return
             End If
 
-            If ((Client.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then 'Tryed to logon again after allready loging on
+            If ((Client.ExtendedInfo.STATE And STATE_FLAGS.HUB_AUTHORIZED) = STATE_FLAGS.HUB_AUTHORIZED) Then 'Tryed to logon again after allready loging on
                 '2 = bad state, client Is attempting to authenticate a second time
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.CLIENT_ATTEMPTED_AUTHING_A_SECOND_TIME, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
 
-            Client.HUB_ID = packet.GetString
+            Dim HUB_ID As String = packet.GetString
 
-            If Client.HUB_ID.Length > 31 Then 'Null not included when your testing strings so its 31 instead of 32 (TODO: Switch this to GetByteString)
+            If HUB_ID.Length > 31 Then 'Null not included when your testing strings so its 31 instead of 32 (TODO: Switch this to GetByteString)
                 '3 = bad size for hub ID 
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.BAD_STRLEN_HUBID, packet.Length, packet.Offset)
                 Return
             End If
 
-            Client.HUB_PASSWORD = packet.GetString
+            Dim HUB_PASSWORD As String = packet.GetString
 
-            If Client.HUB_PASSWORD.Length > 63 Then 'Null not included when your testing strings so its 63 instead of 64 (TODO: Switch this to GetByteString)
+            If HUB_PASSWORD.Length > 63 Then 'Null not included when your testing strings so its 63 instead of 64 (TODO: Switch this to GetByteString)
                 '4 = bad size for hub password 
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.BAD_STRLEN_HUB_PASSWORD, packet.Length, packet.Offset)
                 Return
             End If
 
-            If Client.HUB_ID = "" Then
+            If HUB_ID = "" Then
                 '5 = empty hub ID      
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.STR_BLANK_HUBID, packet.Length, packet.Offset)
                 Return
             End If
-            If Client.HUB_PASSWORD = "" Then
+            If HUB_PASSWORD = "" Then
                 '6 = empty hub password      
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_LOGON, PROTOCOL_VIOLATION_COMMAND_1.STR_BLANK_HUB_PASSWORD, packet.Length, packet.Offset)
                 Return
@@ -1093,7 +1078,7 @@ Public Module ClientData
 
 
             Dim HUB_RESPONCE As HUB_ID_RESPONCES
-            If ValidateHubAccount(Client.HUB_ID, Client.HUB_PASSWORD) Then
+            If ValidateHubAccount(HUB_ID, HUB_PASSWORD) Then
                 HUB_RESPONCE = HUB_ID_RESPONCES.ACCEPTED
             Else
                 HUB_RESPONCE = HUB_ID_RESPONCES.FAIL
@@ -1106,7 +1091,7 @@ Public Module ClientData
 
             Dim response As New PacketClass(OPCODES.PACKET_LOGON)
             response.AddInt32(HUB_RESPONCE)
-            Client.STATE += STATE_FLAGS.HUB_AUTHORIZED 'If the users password is accepted then
+            Client.ExtendedInfo.STATE += STATE_FLAGS.HUB_AUTHORIZED 'If the users password is accepted then
 
             'If packet.ProtocalVersion >= 4.2 Then                     'Version 4.2
             'If Client.
@@ -1114,7 +1099,7 @@ Public Module ClientData
             '    response.AddInt8(Client.IP.GetAddressBytes.Length)  'IPv4|IPv6 Packet Update
             'Else                                                    'this will only send to users version 4.2+
             'End If
-            response.AddByteArray(Client.IP.GetAddressBytes)
+            response.AddByteArray(Client.SocketData.IP.GetAddressBytes)
             Client.Send(response)
             Debug.Print("CMSG_PACKET_LOGON" & vbNewLine)
         End Sub
@@ -1130,12 +1115,12 @@ Public Module ClientData
 #Region "---- 0x0D PACKET_ACCOUNT (account management) [done] ----"
         Private Sub VoidUserAccount(ByVal atIndex As UInt32)
             Dim tClient As ClientClass = CLIENTs.Item(atIndex)
-            tClient.Account = ""
+            tClient.ExtendedInfo.Account.Name = ""
 
             'Update these users, if the account was logged on.
-            If (tClient.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then
+            If (tClient.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then
                 For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                    If (cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then 'Not (cliTemp.Value.Index = atIndex) Then
+                    If (cliTemp.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN Then 'Not (cliTemp.Value.Index = atIndex) Then
                         SEND_PACKET_USERINFO(cliTemp.Value, tClient)
                     End If
                 Next
@@ -1158,7 +1143,7 @@ Public Module ClientData
                     VoidUserAccount(tIndex)
                     Return
                 End If
-                If ((client.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
+                If ((client.ExtendedInfo.STATE And STATE_FLAGS.FLAG_CHANGED) = STATE_FLAGS.FLAG_CHANGED) Then
                     SEND_PACKET_STATSUPDATE(client, 1) 'Update this clients flag now.
                     Return
                 End If
@@ -1292,17 +1277,16 @@ Public Module ClientData
                     Else 'test password
                         If accPass = GetPassword(tmpPath) Then
                             'response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
-                            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
-                                Client.STATE += STATE_FLAGS.ACCOUNT_AUTHORIZED
-                                Client.STATE += STATE_FLAGS.FLAG_CHANGED
+                            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
+                                Client.ExtendedInfo.STATE += STATE_FLAGS.ACCOUNT_AUTHORIZED
+                                Client.ExtendedInfo.STATE += STATE_FLAGS.FLAG_CHANGED
                             End If
-                            Client.Account = accName
-                            Client.Password = accPass
-                            Client.AccountFlag = GetAccountFlags(AccountsPath & Client.Account)
-                            SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.PASSED, Client.Account)
+                            Client.ExtendedInfo.Account.Name = accName
+                            Client.ExtendedInfo.Account.Flag = GetAccountFlags(AccountsPath & Client.ExtendedInfo.Account.Name)
+                            SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.PASSED, Client.ExtendedInfo.Account.Name)
                         Else
-                            If ((Client.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
-                                Client.STATE -= STATE_FLAGS.ACCOUNT_AUTHORIZED
+                            If ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_AUTHORIZED) = STATE_FLAGS.ACCOUNT_AUTHORIZED) Then 'Just incase.....
+                                Client.ExtendedInfo.STATE -= STATE_FLAGS.ACCOUNT_AUTHORIZED
                             End If
                             'response.AddInt32(PACKET_ACCOUNT_RESULTS.FAILED)
                             SMSG_PACKET_ACCOUNTLI(Client, PACKET_ACCOUNT_RESULTS.FAILED, "")
@@ -1354,8 +1338,7 @@ Public Module ClientData
                     Else
                         response.AddInt32(PACKET_ACCOUNT_RESULTS.PASSED)
                     End If
-                    Client.Account = accName
-                    Client.Password = accPass
+                    Client.ExtendedInfo.Account.Name = accName
                     Client.Send(response)
                     Return
 #End Region
@@ -1386,12 +1369,12 @@ Public Module ClientData
                 Call Client.Delete()
                 Return
             End If
-            If (Not ((Client.AccountFlag And FLAGS.B) = FLAGS.B)) And (Not ((Client.AccountFlag And FLAGS.A) = FLAGS.A)) Then
+            If (Not ((Client.ExtendedInfo.Account.Flag And FLAGS.B) = FLAGS.B)) And (Not ((Client.ExtendedInfo.Account.Flag And FLAGS.A) = FLAGS.A)) Then
                 'client must have flag "B" or "A"
                 Call Client.Delete()
                 Return
             End If
-            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 '2 = bad state, client tried to issue command while invisible 
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BROADCASTMESSAGE, PROTOCOL_VIOLATION_COMMAND_7.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -1420,8 +1403,8 @@ Public Module ClientData
 
             'The message goes to every client.
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                    SMSG_PACKET_COMMANDOVERBOTNET(Client.AccountUniqueID, PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS, SenderName, command, cliTemp.Value)
+                If ((cliTemp.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                    SMSG_PACKET_COMMANDOVERBOTNET(Client.ExtendedInfo.ID, PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS, SenderName, command, cliTemp.Value)
                 End If
             Next
         End Sub
@@ -1466,7 +1449,7 @@ Public Module ClientData
                 Call Client.Delete()
                 Return
             End If
-            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 '2 = bad state, client tried to issue command while invisible 
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -1498,7 +1481,7 @@ Public Module ClientData
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_COMMAND, PROTOCOL_VIOLATION_COMMAND_8.EMPTY_COMMAND, packet.Length, (packet.Length - packet.Offset))
                 Return
             End If
-            SMSG_PACKET_COMMANDOVERBOTNET(Client.AccountUniqueID, PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT, sender, command, CLIENTs(target_bot_id))
+            SMSG_PACKET_COMMANDOVERBOTNET(Client.ExtendedInfo.ID, PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT, sender, command, CLIENTs(target_bot_id))
         End Sub
         Public Sub CMSG_PACKET_MESSAGE(ByRef packet As PacketClass, ByRef Client As ClientClass)
             Debug.Print("CMSG_PACKET_MESSAGE" & vbNewLine)
@@ -1529,12 +1512,12 @@ Public Module ClientData
                 Call Client.Delete()
                 Return
             End If
-            If (Not ((Client.DatabaseFlags And FLAGS.B) = FLAGS.B)) And (Not ((Client.DatabaseFlags And FLAGS.C) = FLAGS.C)) Then
+            If (Not ((Client.ExtendedInfo.Database.Flag And FLAGS.B) = FLAGS.B)) And (Not ((Client.ExtendedInfo.Database.Flag And FLAGS.C) = FLAGS.C)) Then
                 'client must have flag "B" or "A"
                 'Call Client.Delete()
                 Return
             End If
-            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 '2 = bad state, client tried to issue command while invisible 
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_MESSAGE, PROTOCOL_VIOLATION_COMMAND_7.BAD_STATE, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -1562,9 +1545,9 @@ Public Module ClientData
 
             'The message goes to every client on this database.
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If ((cliTemp.Value.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
-                    If cliTemp.Value.DatabaseAccountID = Client.DatabaseAccountID Then 'Must be on the same database
-                        SMSG_PACKET_COMMANDOVERBOTNET(Client.AccountUniqueID, PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE, SenderName, command, cliTemp.Value)
+                If ((cliTemp.Value.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+                    If cliTemp.Value.ExtendedInfo.Database.Name = Client.ExtendedInfo.Database.Name Then 'Must be on the same database
+                        SMSG_PACKET_COMMANDOVERBOTNET(Client.ExtendedInfo.ID, PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE, SenderName, command, cliTemp.Value)
                     End If
                 End If
             Next
@@ -1616,10 +1599,10 @@ Public Module ClientData
             'Send back their current option values.
             Dim response As New PacketClass(OPCODES.PACKET_CHATDROPOPTIONS)
             response.AddInt8(0) 'Botnet only had command 0
-            response.AddInt8(Client.ChatDropOptions.BroadCastedChat)
-            response.AddInt8(Client.ChatDropOptions.DatabaseChat)
-            response.AddInt8(Client.ChatDropOptions.WhisperChat)
-            response.AddInt8(Client.ChatDropOptions.OtherDatabaseChat)
+            response.AddInt8(Client.ExtendedInfo.ChatDropOptions.BroadCastedChat)
+            response.AddInt8(Client.ExtendedInfo.ChatDropOptions.DatabaseChat)
+            response.AddInt8(Client.ExtendedInfo.ChatDropOptions.WhisperChat)
+            response.AddInt8(Client.ExtendedInfo.ChatDropOptions.OtherDatabaseChat)
             Client.Send(response)
         End Sub
         Public Sub CMSG_CHAT_DROP(ByRef packet As PacketClass, ByRef Client As ClientClass)
@@ -1636,33 +1619,33 @@ Public Module ClientData
             Dim bIntCommand As UInteger = packet.GetInt8()
             Select Case bIntCommand
                 Case 0 '(0 is the only command botnet has for this feature)
-                    Client.ChatDropOptions.BroadCastedChat = packet.GetInt8()
-                    If (Client.ChatDropOptions.BroadCastedChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
-                        Client.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+                    Client.ExtendedInfo.ChatDropOptions.BroadCastedChat = packet.GetInt8()
+                    If (Client.ExtendedInfo.ChatDropOptions.BroadCastedChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ExtendedInfo.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If Client.ChatDropOptions.BroadCastedChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
-                        Client.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
+                    If Client.ExtendedInfo.ChatDropOptions.BroadCastedChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ExtendedInfo.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
-                    Client.ChatDropOptions.DatabaseChat = packet.GetInt8()
-                    If (Client.ChatDropOptions.DatabaseChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
-                        Client.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+                    Client.ExtendedInfo.ChatDropOptions.DatabaseChat = packet.GetInt8()
+                    If (Client.ExtendedInfo.ChatDropOptions.DatabaseChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ExtendedInfo.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If Client.ChatDropOptions.DatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
-                        Client.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
+                    If Client.ExtendedInfo.ChatDropOptions.DatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ExtendedInfo.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
-                    Client.ChatDropOptions.WhisperChat = packet.GetInt8()
-                    If (Client.ChatDropOptions.WhisperChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
-                        Client.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+                    Client.ExtendedInfo.ChatDropOptions.WhisperChat = packet.GetInt8()
+                    If (Client.ExtendedInfo.ChatDropOptions.WhisperChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ExtendedInfo.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If Client.ChatDropOptions.WhisperChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
-                        Client.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
+                    If Client.ExtendedInfo.ChatDropOptions.WhisperChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ExtendedInfo.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
-                    Client.ChatDropOptions.OtherDatabaseChat = packet.GetInt8()
-                    If (Client.ChatDropOptions.OtherDatabaseChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
-                        Client.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
+                    Client.ExtendedInfo.ChatDropOptions.OtherDatabaseChat = packet.GetInt8()
+                    If (Client.ExtendedInfo.ChatDropOptions.OtherDatabaseChat < CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL) Then
+                        Client.ExtendedInfo.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL
                     End If
-                    If Client.ChatDropOptions.OtherDatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
-                        Client.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
+                    If Client.ExtendedInfo.ChatDropOptions.OtherDatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                        Client.ExtendedInfo.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL
                     End If
                     Exit Select
             End Select
@@ -1686,7 +1669,7 @@ Public Module ClientData
             End If
 
             'Check client state.
-            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 '2 = bad state, client must be visible
                 PROTOCOL_VIOLATION(Client, OPCODES.PACKET_BOTNETCHAT, 2, packet.Length, (packet.Length - packet.Offset))
                 Return
@@ -1761,9 +1744,9 @@ Public Module ClientData
         End Sub
         Private Sub CHAT_MESSAGE_TO_ALL_USERS(ByRef Client As ClientClass, ByVal command As PACKET_COMMAND_COMMANDS, ByVal action As PACKET_COMMAND_ACTIONS, ByVal message() As Byte)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If Not (cliTemp.Value.Account = Client.Account) Then '
+                If Not (cliTemp.Value.ExtendedInfo.Account.Name = Client.ExtendedInfo.Account.Name) Then '
                     'Enable ChatDrop Fire this message through CHAT_MESSAGE_TO_USER pump since it has all the checking finnished.
-                    CHAT_MESSAGE_TO_USER(Client, command, action, cliTemp.Value.AccountUniqueID, message)
+                    CHAT_MESSAGE_TO_USER(Client, command, action, cliTemp.Value.ExtendedInfo.ID, message)
                 End If
             Next
         End Sub
@@ -1778,7 +1761,7 @@ Public Module ClientData
         'End Sub
         Private Sub CHAT_MESSAGE_TO_USER(ByRef Client As ClientClass, ByVal command As PACKET_COMMAND_COMMANDS, ByVal action As PACKET_COMMAND_ACTIONS, ByVal userid As UInt32, ByVal message() As Byte)
             'Is the sender logged in yet.
-            If Not ((Client.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If Not ((Client.ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 Return 'This right here should be a PROTOCOL_VIOLATION
             End If
             'Does the user in question exist
@@ -1786,7 +1769,7 @@ Public Module ClientData
                 Return 'The user in question does not exist, stop wasting time here.
             End If
             'is the user in question logged in
-            If Not ((CLIENTs(userid).STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
+            If Not ((CLIENTs(userid).ExtendedInfo.STATE And STATE_FLAGS.ACCOUNT_LOGGED_IN) = STATE_FLAGS.ACCOUNT_LOGGED_IN) Then
                 Return 'this user is not online yet
             End If
 
@@ -1798,13 +1781,13 @@ Public Module ClientData
 #Region "Broadcasted to all"
                 Case PACKET_COMMAND_COMMANDS.BROADCAST_TO_ALL_USERS
                     'are we blocking database messages
-                    If CLIENTs(userid).ChatDropOptions.BroadCastedChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
-                        If CLIENTs(userid).ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                    If CLIENTs(userid).ExtendedInfo.ChatDropOptions.BroadCastedChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                        If CLIENTs(userid).ExtendedInfo.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
                             Return
                         End If
                         'are we blocking <no account>s
-                        If CLIENTs(userid).ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
-                            If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                        If CLIENTs(userid).ExtendedInfo.ChatDropOptions.BroadCastedChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                            If Client.ExtendedInfo.Account.Name = "" Or Client.ExtendedInfo.Account.Name.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
                                 Return
                             End If
                         End If
@@ -1813,13 +1796,13 @@ Public Module ClientData
 #End Region
 #Region "To User (whispers)"
                 Case PACKET_COMMAND_COMMANDS.DIRECTED_TO_SPECIFIC_CLIENT
-                    If CLIENTs(userid).ChatDropOptions.WhisperChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
-                        If CLIENTs(userid).ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                    If CLIENTs(userid).ExtendedInfo.ChatDropOptions.WhisperChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                        If CLIENTs(userid).ExtendedInfo.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
                             Return
                         End If
                         'are we blocking <no account>s
-                        If CLIENTs(userid).ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
-                            If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                        If CLIENTs(userid).ExtendedInfo.ChatDropOptions.WhisperChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                            If Client.ExtendedInfo.Account.Name = "" Or Client.ExtendedInfo.Account.Name.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
                                 Return
                             End If
                         End If
@@ -1829,17 +1812,17 @@ Public Module ClientData
 #Region "To Database"
                 Case PACKET_COMMAND_COMMANDS.SEND_TO_DATABASE
                     'Is this user the same database
-                    If Not (Client.DatabaseAccountID.ToLower = CLIENTs(userid).DatabaseAccountID.ToLower) Then
+                    If Not (Client.ExtendedInfo.Database.Name.ToLower = CLIENTs(userid).ExtendedInfo.Database.Name.ToLower) Then
                         Return
                     End If
                     'chatdrop.
-                    If CLIENTs(userid).ChatDropOptions.DatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
-                        If CLIENTs(userid).ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                    If CLIENTs(userid).ExtendedInfo.ChatDropOptions.DatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                        If CLIENTs(userid).ExtendedInfo.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
                             Return
                         End If
                         'are we blocking <no account>s
-                        If CLIENTs(userid).ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
-                            If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                        If CLIENTs(userid).ExtendedInfo.ChatDropOptions.DatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                            If Client.ExtendedInfo.Account.Name = "" Or Client.ExtendedInfo.Account.Name.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
                                 Return
                             End If
                         End If
@@ -1850,14 +1833,14 @@ Public Module ClientData
                     Return
             End Select
             'is this message from somone on another database.
-            If CLIENTs(userid).ChatDropOptions.OtherDatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
-                If CLIENTs(userid).ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
-                    If Not (Client.DatabaseAccountID.ToLower = CLIENTs(userid).DatabaseAccountID.ToLower) Then 'I donot believe i added the bracketed no account name to the server but anyways
+            If CLIENTs(userid).ExtendedInfo.ChatDropOptions.OtherDatabaseChat > CHAT_DROP_OPTIONS_SETTINGS.ALLOW_ALL Then
+                If CLIENTs(userid).ExtendedInfo.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_ALL Then
+                    If Not (Client.ExtendedInfo.Database.Name.ToLower = CLIENTs(userid).ExtendedInfo.Database.Name.ToLower) Then 'I donot believe i added the bracketed no account name to the server but anyways
                         Return
                     End If
                 End If
-                If CLIENTs(userid).ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
-                    If Client.Account = "" Or Client.Account.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
+                If CLIENTs(userid).ExtendedInfo.ChatDropOptions.OtherDatabaseChat = CHAT_DROP_OPTIONS_SETTINGS.REFUSE_FROM_NOACCOUNT Then
+                    If Client.ExtendedInfo.Account.Name = "" Or Client.ExtendedInfo.Account.Name.ToLower = "<no account>" Then 'I donot believe i added the bracketed no account name to the server but anyways
                         Return
                     End If
                 End If
@@ -1871,7 +1854,7 @@ Public Module ClientData
             Dim sendmessage As New PacketClass(OPCODES.PACKET_BOTNETCHAT)
             sendmessage.AddInt32(command)
             sendmessage.AddInt32(action)
-            sendmessage.AddInt32(Client.AccountUniqueID)
+            sendmessage.AddInt32(Client.ExtendedInfo.ID)
             sendmessage.AddByteString(message, message.Length)
             CLIENTs(userid).Send(sendmessage)
         End Sub
@@ -1879,16 +1862,18 @@ Public Module ClientData
 
         Private Function IsUserNameOnLine(ByVal AccountName As String) As Boolean
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.Account.ToLower = AccountName.ToLower Then
-                    Return True
-                    Exit For
+                If Not (cliTemp.Value.ExtendedInfo.Account.Name = Nothing) Then
+                    If cliTemp.Value.ExtendedInfo.Account.Name.ToLower = AccountName.ToLower Then
+                        Return True
+                        Exit For
+                    End If
                 End If
             Next
             Return False
         End Function
         Private Sub KickUser(ByVal AccountName As String)
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.Account.ToLower = AccountName.ToLower Then
+                If cliTemp.Value.ExtendedInfo.Account.Name.ToLower = AccountName.ToLower Then
                     cliTemp.Value.Delete()
                     Return
                 End If
@@ -1897,7 +1882,7 @@ Public Module ClientData
 
         Private Function GetUserIndex(ByVal AccountName As String, Optional NotSelf As UInt32 = 0) As UInt32
             For Each cliTemp As KeyValuePair(Of UInteger, ClientClass) In CLIENTs
-                If cliTemp.Value.Account.ToLower = AccountName.ToLower Then
+                If cliTemp.Value.ExtendedInfo.Account.Name.ToLower = AccountName.ToLower Then
                     If NotSelf > 0 Then
                         'if > 0 we passed it our index test now.
                         If Not (cliTemp.Value.Index = NotSelf) Then
@@ -1905,7 +1890,7 @@ Public Module ClientData
                             Return cliTemp.Value.Index
                         End If
                     Else
-                            Return cliTemp.Value.Index
+                        Return cliTemp.Value.Index
                     End If
                 End If
             Next

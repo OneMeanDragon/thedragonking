@@ -44,7 +44,7 @@ Public Module Functions
         If Client Is Nothing Then
             buffer = buffer + [String].Format("DEBUG: Packet Dump{0}", vbNewLine)
         Else
-            buffer = buffer + [String].Format("[{0}:{1}] DEBUG: Packet Dump{2}", Client.IP, Client.Port, vbNewLine)
+            buffer = buffer + [String].Format("[{0}:{1}] DEBUG: Packet Dump{2}", Client.SocketData.IP, Client.SocketData.Port, vbNewLine)
         End If
 
 
