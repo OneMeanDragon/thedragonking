@@ -138,18 +138,21 @@ Public Module Packets
 
             Data(Data.Length - 1) = 0
         End Sub
-        Public Sub AddByteString(ByVal bytStr() As Byte, ByVal iLength As Int32)
-            Dim original_length As UInt32 = Data.Length
-            ReDim Preserve Data(original_length + iLength)
+        Public Sub AddByteString(ByVal bytStr() As Byte, ByVal iLength As UInt32)
+            '/bncommand 1 345 bobmarley asdffdsa gsdfggfds
+            Dim inSet As UInt32 = 0
+            Dim i As UInt32 = Data.Length
+
+            Dim dwEndLength As UInt32 = Data.Length + iLength
+            While (i < dwEndLength)
+                ReDim Preserve Data(i)
+                Data(i) = (bytStr(inSet) And &HFF)
+                i += 1
+                inSet += 1
+            End While
+
             Data(2) = (Data.Length) Mod 256
             Data(3) = (Data.Length) \ 256
-
-            Dim i As Int32 = 0
-            While (i < iLength)
-                Data(original_length + i) = (bytStr(i) And &HFF)
-                i += 1
-            End While
-            Data(Data.Length - 1) = 0
         End Sub
         Public Sub AddDouble(ByVal buffer2 As Double)
             Dim buffer1 As Byte() = BitConverter.GetBytes(buffer2)
@@ -251,7 +254,7 @@ Public Module Packets
         End Function
 
         Public Function GetByteString() As Byte()
-            Dim bytOut() As Byte
+            Dim bytOut(0) As Byte
             Dim i As UInt32
             Dim start As UInt32 = Offset
 
@@ -263,6 +266,7 @@ Public Module Packets
             End While
             ReDim Preserve bytOut(i)
             bytOut(i) = 0
+            Offset += 1
             Return bytOut
         End Function
 
