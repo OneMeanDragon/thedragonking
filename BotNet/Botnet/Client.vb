@@ -840,6 +840,12 @@ Public Module ClientData
             End If
             If packet.Length >= 12 Then
                 Client.CLIENT_CAPABILITIES = packet.GetInt32
+                If (Client.CLIENT_CAPABILITIES < 0) Then
+                    Client.CLIENT_CAPABILITIES = 0
+                End If
+                If Client.CLIENT_CAPABILITIES > 2 Then
+                    Client.CLIENT_CAPABILITIES = 2
+                End If
             End If
 
             '(send to client) id 0x09: acknowledge communication version
